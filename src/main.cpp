@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <vector>
+#include "stb_image.h"
 
 /**
  * Class that manages input arguments and program help.
@@ -71,12 +72,7 @@ public:
 		}
 
 		//actions control
-		NOPE, //! No action requested.
-				TRAIN, //! Find filter on training set.
-				REPAIR, //! Repair filter.
-				DAMAGE, //! Damage filter.
-				TEST,	//! Test filter on testing set.
-				HELP	//! Show help.
+
 		switch (action) {
 			case TRAIN:
 				if(set.length()==0 || setOut.length()==0)
@@ -113,16 +109,16 @@ public:
 	 * Prints program help to stdout.
 	 */
 	static void showHelp(){
-		std::cout<< "Thank you for using "<< PROGRAM_NAME <<". "
+		std::cout << "Thank you for using "<< PROGRAM_NAME <<". "
 				<< "This program was developed at FIT BUT as project to course: Bio-Inspired Computers. \n\n"
 				<< "\t-train" <<"\n\t\tYou want to develop new edge detection filter on given training data set. Developed filter chromosome will be printed to stdout.\n"
-				<<"\n\t\tPROVIDE: -set, -setOut"
-				<< "\t-repair" <<"\n\t\tIt will try to find new implementation of filter with given resources (damaged before).. Developed filter chromosome will be printed to stdout.\n"
-				<<"\n\t\tPROVIDE: -set, -setOut, -chromosome"
-				<< "\t-damage" <<"\n\t\tWill damage the existing filter. Randomly selects block and changes it to block with 0 output.. Damaged filter chromosome will be printed to stdout.\n"
-				<<"\n\t\tPROVIDE: chromosome"
+				<<"\t\tPROVIDE: -set, -setOut\n"
+				<< "\t-repair" <<"\n\t\tIt will try to find new implementation of filter with given resources (damaged before). Developed filter chromosome will be printed to stdout.\n"
+				<<"\t\tPROVIDE: -set, -setOut, -chromosome\n"
+				<< "\t-damage" <<"\n\t\tWill damage the existing filter. Randomly selects block and changes it to block with 0 output. Damaged filter chromosome will be printed to stdout.\n"
+				<<"\t\tPROVIDE: chromosome\n"
 				<< "\t-test" <<"\n\t\tYou want to test your developed filter on given testing data set.\n"
-				<<"\n\t\tPROVIDE: -set, -setOut, -chromosome"
+				<<"\t\tPROVIDE: -set, -setOut, -chromosome\n"
 
 				<< "\t-set" <<"\n\t\tPath to folder with train/test set (filled with jpg images).\n"
 				<< "\t-setOut" <<"\n\t\tPath to folder with required filter output. Name of image must corespond with name of input image from -set.\n"
@@ -143,7 +139,7 @@ public:
 		return action;
 	}
 
-	const FILE*& getChromosome() const {
+	FILE* getChromosome() const {
 		return chromosome;
 	}
 
