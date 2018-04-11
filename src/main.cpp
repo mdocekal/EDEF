@@ -6,9 +6,12 @@
  * @brief Entry point of EDEF (Evolutionary designer of edge filter).
  */
 #include <iostream>
+#include <fstream>
 #include <stdexcept>
 #include <vector>
-#include "stb_image.h"
+
+#include "Config.h"
+#include "Image.h"
 
 /**
  * Class that manages input arguments and program help.
@@ -61,6 +64,17 @@ public:
 					throw std::invalid_argument("Must specify chromosome file that can be open for reading.");
 				}
 				shouldClose.push_back(chromosome);
+			}else if(actArg=="-config"){
+				if(++i>=argc || ! (chromosome= fopen(argv[i], "rb"))){
+					throw std::invalid_argument("Must specify chromosome file that can be open for reading.");
+				}
+
+				std::ifstream f(argv[i]);
+				if(!f){
+					throw std::invalid_argument("Must specify chromosome file that can be open for reading.");
+				}
+				config.read(f);
+
 			}else if (actArg=="-h"){
 				//show help
 				if(action!=Action::NOPE)
@@ -75,13 +89,13 @@ public:
 
 		switch (action) {
 			case TRAIN:
-				if(set.length()==0 || setOut.length()==0)
-					throw std::invalid_argument("-train needs: -set, -setOut.");
+				if(set.length()==0 || setOut.length()==0 || config.empty())
+					throw std::invalid_argument("-train needs: -set, -setOut, -config.");
 
 				break;
 			case REPAIR:
-				if(set.length()==0 || setOut.length()==0 || chromosome==nullptr)
-					throw std::invalid_argument("-repair needs: -set, -setOut, -chromosome.");
+				if(set.length()==0 || setOut.length()==0 || chromosome==nullptr || config.empty())
+					throw std::invalid_argument("-repair needs: -set, -setOut, -chromosome, -config.");
 				break;
 			case DAMAGE:
 				if(chromosome==nullptr)
@@ -112,9 +126,9 @@ public:
 		std::cout << "Thank you for using "<< PROGRAM_NAME <<". "
 				<< "This program was developed at FIT BUT as project to course: Bio-Inspired Computers. \n\n"
 				<< "\t-train" <<"\n\t\tYou want to develop new edge detection filter on given training data set. Developed filter chromosome will be printed to stdout.\n"
-				<<"\t\tPROVIDE: -set, -setOut\n"
+				<<"\t\tPROVIDE: -set, -setOut, -config\n"
 				<< "\t-repair" <<"\n\t\tIt will try to find new implementation of filter with given resources (damaged before). Developed filter chromosome will be printed to stdout.\n"
-				<<"\t\tPROVIDE: -set, -setOut, -chromosome\n"
+				<<"\t\tPROVIDE: -set, -setOut, -chromosome, -config\n"
 				<< "\t-damage" <<"\n\t\tWill damage the existing filter. Randomly selects block and changes it to block with 0 output. Damaged filter chromosome will be printed to stdout.\n"
 				<<"\t\tPROVIDE: chromosome\n"
 				<< "\t-test" <<"\n\t\tYou want to test your developed filter on given testing data set.\n"
@@ -123,7 +137,8 @@ public:
 				<< "\t-set" <<"\n\t\tPath to folder with train/test set (filled with jpg images).\n"
 				<< "\t-setOut" <<"\n\t\tPath to folder with required filter output. Name of image must corespond with name of input image from -set.\n"
 
-				<< "\t-chromosome" <<"\n\t\tPath to saved chromosome\n"
+				<< "\t-chromosome" <<"\n\t\tPath to saved chromosome.\n"
+				<< "\t-config" <<"\n\t\tPath to configuration file.\n"
 
 				<< "\t-h" <<"\n\t\tWrites help to stdout and exists the program."
 				<< std::endl;
@@ -151,11 +166,16 @@ public:
 		return setOut;
 	}
 
+	const Config& getConfig() const {
+		return config;
+	}
+
 private:
 
 	std::string set; //! Path to folder with data set.
 	std::string setOut; //! Path to folder with data set ouput.
 	FILE* chromosome=nullptr; //! File containing chromosome.
+	Config config; //!Loaded configuration.
 
 	Action action=Action::NOPE; //! Action user wants to perform.
 
@@ -169,12 +189,24 @@ int main(int argc, char* argv[]){
 	try {
 		Args myArgs(argc, argv);
 
+		Image img("data/download/test/3096.jpg");
+
+		std::cout << img.getWidth() << ", " << img.getHeight() << ", "  << img.getBytesPerPixel() <<std::endl;
+
 		switch (myArgs.getAction()) {
 		case Args::Action::HELP:
 			//User needs our help!
 			Args::showHelp();
 			break;
 		case Args::Action::TRAIN:
+
+			for(auto KV : myArgs.getConfig()){
+				std::cout << KV.first << " = " << KV.second <<std::endl;
+			}
+
+
+
+
 
 			break;
 		case Args::Action::REPAIR:

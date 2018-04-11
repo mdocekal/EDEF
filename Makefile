@@ -12,7 +12,7 @@ all: $(PROGS)
 %.o: src/%.cpp 
 	$(CC) $(CFLAGS) -c $< -o $@ 
 
-edef: main.o
+edef: Image.o Config.o main.o
 	$(CC) $(CFLAGS) $^ -o $@ -lm
 
 clean:
