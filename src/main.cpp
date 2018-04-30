@@ -26,6 +26,8 @@ public:
 		REPAIR, //! Repair filter.
 		DAMAGE, //! Damage filter.
 		TEST,	//! Test filter on testing set.
+		STATUS, //! Get filter status.
+		USE, //! Use filter on image.
 		HELP	//! Show help.
 	};
 
@@ -53,6 +55,12 @@ public:
 			}else if(actArg=="-test"){
 				if(action!=NOPE) throw std::invalid_argument("You can not select multiple actions.");
 				action=TEST;
+			}else if(actArg=="-status"){
+				if(action!=NOPE) throw std::invalid_argument("You can not select multiple actions.");
+				action=STATUS;
+			}else if(actArg=="-status"){
+				if(action!=NOPE) throw std::invalid_argument("You can not select multiple actions.");
+				action=USE;
 			}else if(actArg=="-set"){
 				if(++i>=argc) throw std::invalid_argument("No value for set.");
 				set=argv[i];
@@ -64,6 +72,11 @@ public:
 					throw std::invalid_argument("Must specify chromosome file that can be open for reading.");
 				}
 				shouldClose.push_back(chromosome);
+			}else if(actArg=="-on"){
+				if(++i>=argc || ! (on= fopen(argv[i], "rb"))){
+					throw std::invalid_argument("Must specify image file that can be open for reading.");
+				}
+				shouldClose.push_back(on);
 			}else if(actArg=="-config"){
 				if(++i>=argc || ! (chromosome= fopen(argv[i], "rb"))){
 					throw std::invalid_argument("Must specify chromosome file that can be open for reading.");
@@ -105,6 +118,14 @@ public:
 				if(set.length()==0 || setOut.length()==0 || chromosome==nullptr)
 					throw std::invalid_argument("-test needs: -set, -setOut, -chromosome.");
 				break;
+			case STATUS:
+				if(chromosome==nullptr)
+					throw std::invalid_argument("-status needs: -chromosome.");
+				break;
+			case USE:
+				if(chromosome==nullptr || on==nullptr)
+					throw std::invalid_argument("-use needs: -chromosome, -on.");
+				break;
 			case NOPE:
 				throw std::invalid_argument("No action.");
 				break;
@@ -133,9 +154,16 @@ public:
 				<<"\t\tPROVIDE: chromosome\n"
 				<< "\t-test" <<"\n\t\tYou want to test your developed filter on given testing data set.\n"
 				<<"\t\tPROVIDE: -set, -setOut, -chromosome\n"
+				<< "\t-status" <<"\n\t\tChecks filter state (how much it is damaged).\n"
+				<<"\t\tPROVIDE: -chromosome\n"
+				<< "\t-use" <<"\n\t\tUse filter on given image.\n"
+				<<"\t\tPROVIDE: -chromosome -on\n"
+
 
 				<< "\t-set" <<"\n\t\tPath to folder with train/test set (filled with jpg images).\n"
 				<< "\t-setOut" <<"\n\t\tPath to folder with required filter output. Name of image must corespond with name of input image from -set.\n"
+
+				<< "\t-on" <<"\n\t\tPath to image (jpg).\n"
 
 				<< "\t-chromosome" <<"\n\t\tPath to saved chromosome.\n"
 				<< "\t-config" <<"\n\t\tPath to configuration file.\n"
@@ -174,6 +202,7 @@ private:
 
 	std::string set; //! Path to folder with data set.
 	std::string setOut; //! Path to folder with data set ouput.
+	FILE* on=nullptr; //! Image.
 	FILE* chromosome=nullptr; //! File containing chromosome.
 	Config config; //!Loaded configuration.
 
@@ -189,7 +218,7 @@ int main(int argc, char* argv[]){
 	try {
 		Args myArgs(argc, argv);
 
-		Image img("data/download/test/3096.jpg");
+		Image img("data/pictures/download/test/3096.jpg");
 
 		std::cout << img.getWidth() << ", " << img.getHeight() << ", "  << img.getBytesPerPixel() <<std::endl;
 
