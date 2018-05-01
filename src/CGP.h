@@ -11,14 +11,17 @@
 #ifndef SRC_CGP_H_
 #define SRC_CGP_H_
 
+#include <vector>
+#include <set>
 #include <random>
+#include <iostream>
 #include "Image.h"
 
 
 /**
  * Representation of chromosome.
  */
-typedef std::vector<int> Chromosome;
+typedef std::vector<unsigned> Chromosome;
 
 /**
  * Representation of whole population.
@@ -69,8 +72,6 @@ public:
 	/**
 	 * Evolve chromosome.
 	 *
-	 * @param[in] generations
-	 * 	Number of generations.
 	 * @param[in] runs
 	 * 	Number of evolution runs.
 	 * @param[in] train
@@ -79,7 +80,7 @@ public:
 	 * 	Train images that will be used for filter evaluation. (Desired result)
 	 * @return Evolved chromosome of a filter.
 	 */
-	Chromosome evolve(const unsigned generations, const unsigned runs,
+	Chromosome evolve(const unsigned runs,
 				const std::vector<Image> & train, const std::vector<Image> & trainOut);
 
 
@@ -109,13 +110,6 @@ public:
 		this->mutationMax = mutationMax;
 	}
 
-	unsigned getPopulationMax() const {
-		return populationMax;
-	}
-
-	void setPopulationMax(unsigned populationMax = 5) {
-		this->populationMax = populationMax;
-	}
 
 	unsigned getRows() const {
 		return rows;
@@ -126,10 +120,35 @@ public:
 		calcColVals();
 	}
 
+	const std::set<unsigned>& getDamaged() const {
+		return damaged;
+	}
+
+	void setDamaged(const std::set<unsigned>& damaged) {
+		this->damaged = damaged;
+	}
+
+	unsigned getPopulationSize() const {
+		return populationSize;
+	}
+
+	void setPopulationSize(unsigned populationSize = 5) {
+		this->populationSize = populationSize;
+	}
+
+	unsigned getGenerations() const {
+		return generations;
+	}
+
+	void setGenerations(unsigned generations = 50000) {
+		this->generations = generations;
+	}
+
 private:
 	unsigned cols;	//! cols in CGP matrix
 	unsigned rows;	//! rows in CGP matrix
-	unsigned populationMax=5;	//! maximum size of population
+	unsigned populationSize=5;	//! size of population
+	unsigned generations=50000; //! number of generations
 	unsigned mutationMax=3; //! maximum number of mutations for one mutation
 	unsigned lBack=1; //! CGP lBack parameter
 
@@ -138,9 +157,13 @@ private:
 
 	std::mt19937 randGen;	//! Random number generator.
 
+	std::uniform_int_distribution<std::mt19937::result_type> distFunctions; //! Distribution for generatting random functions
+
 	std::vector<std::vector<int>> colVal; //! Pre calculated posible values of inputs for columns
 
 	std::vector<u_int8_t> outputs; //! tmp cache for block outputs when filter is applied.
+
+	std::set<unsigned> damaged; //! Contains indexes of damaged blocks. (first block index is PARAM_IN)
 
 
 	/**
@@ -163,7 +186,7 @@ private:
 	 * @param[in] trainOut
 	 * 	Train images that will be used for filter evaluation. (Desired result)
 	 */
-	static void evaluate(const Population& population, unsigned& bestFitness, unsigned& bestIndex,
+	void evaluate(const Population& population, unsigned& bestFitness, unsigned& bestIndex,
 			const std::vector<Image>& train, const std::vector<Image>& trainOut);
 
 	/**
@@ -177,7 +200,7 @@ private:
 	 * 	Train images that will be used for filter evaluation. (Desired result)
 	 * @return Chromosome fitness on training data.
 	 */
-	static u_int64_t fitness(const Chromosome& c, const std::vector<Image>& train, const std::vector<Image>& trainOut);
+	u_int64_t fitness(const Chromosome& c, const std::vector<Image>& train, const std::vector<Image>& trainOut);
 
 	/**
 	 * Apply filter.
@@ -190,7 +213,7 @@ private:
 	 * 	Filter inputs.
 	 * @return Result of filter
 	 */
-	static uint8_t apply(const Chromosome&c, const std::set<unsigned>& usedBlocks, const std::vector<uint8_t>& inputs);
+	uint8_t apply(const Chromosome&c, const std::set<unsigned>& usedBlocks, const std::vector<uint8_t>& inputs);
 
 	/**
 	 * Get used blocks in chromosome.
@@ -200,6 +223,14 @@ private:
 	 * @return List of used block indexes. (first block index is PARAM_IN)
 	 */
 	static std::set<unsigned> usedBlocks(const Chromosome&c);
+
+	/**
+	 * Mutatates given chromosome
+	 *
+	 * @param[in|out] c
+	 * 	Chromosome that will be mutated.
+	 */
+	void mutate(Chromosome& c);
 
 
 };

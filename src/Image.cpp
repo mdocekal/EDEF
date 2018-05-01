@@ -14,25 +14,22 @@
 #define STBI_NO_GIF
 #include "stb_image.h"
 
-Image::Image(const std::string& path) {
+Image::Image(const std::string& path) :path(path) {
 	load(path);
 }
 
 void Image::load(const std::string& path){
 	free();
-	pixels=stbi_load(path.c_str(), &width, &height, &bytesPerPixel, 0);
+	uint8_t* tmpPixels=stbi_load(path.c_str(), &width, &height, &bytesPerPixel, 0);
 
 	std::string msg("Invalid image: ");
 	msg+=path;
-	if(pixels == NULL) throw std::runtime_error(msg);
-}
+	if(tmpPixels == NULL) throw std::runtime_error(msg);
 
-Image::~Image(){
-	free();
+	pixels.insert(pixels.end(), &tmpPixels[0], &tmpPixels[width*height]);
+	stbi_image_free(tmpPixels);
 }
 
 void Image::free(){
-	if(pixels!=nullptr){
-		stbi_image_free(pixels);
-	}
+	pixels.clear();
 }

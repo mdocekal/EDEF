@@ -53,6 +53,8 @@ public:
 	    return data[key];
 	}
 
+
+
 	/**
 	 * Get iterator to beginning.
 	 *
@@ -105,6 +107,24 @@ public:
 	 */
 	std::map<std::string, std::string>::const_iterator cend() const {
 		return data.cend();
+	}
+	/**
+	 * Searches the container for an element with a key equivalent to k and returns an iterator to it if found,
+	 * otherwise it returns an iterator to map::end.
+	 *
+	 * @return	An iterator to the element, if an element with specified key is found, or map::end otherwise.
+	 */
+	std::map<std::string, std::string>::iterator find(const std::string k) {
+		return data.find(k);
+	}
+	/**
+	 * Searches the container for an element with a key equivalent to k and returns an iterator to it if found,
+	 * otherwise it returns an iterator to map::end.
+	 *
+	 * @return	An iterator to the element, if an element with specified key is found, or map::end otherwise.
+	 */
+	std::map<std::string, std::string>::const_iterator find(const std::string k) const {
+		return data.find(k);
 	}
 
 	/**

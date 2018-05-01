@@ -8,10 +8,13 @@
 #include <iostream>
 #include <fstream>
 #include <stdexcept>
+#include <sstream>
 #include <vector>
+#include <set>
 
 #include "Config.h"
 #include "Image.h"
+#include "CGP.h"
 
 /**
  * Class that manages input arguments and program help.
@@ -19,6 +22,8 @@
 class Args {
 public:
 	static const char PROGRAM_NAME[];
+
+	static const std::set<std::string> keyWords;
 
 	enum Action {
 		NOPE, //! No action requested.
@@ -63,22 +68,51 @@ public:
 				action=USE;
 			}else if(actArg=="-set"){
 				if(++i>=argc) throw std::invalid_argument("No value for set.");
-				set=argv[i];
+
+				//read paths to images
+				while(i<argc && keyWords.find(argv[i])==keyWords.end()){
+					set.push_back(argv[i++]);
+				}
+				if(keyWords.find(argv[i])!=keyWords.end()){
+					--i;
+				}
 			}else if(actArg=="-setOut"){
 				if(++i>=argc) throw std::invalid_argument("No value for setOut.");
-				setOut=argv[i];
+				//read paths to images
+				while (i < argc && keyWords.find(argv[i]) == keyWords.end()) {
+					setOut.push_back(argv[i++]);
+				}
+				if (keyWords.find(argv[i]) != keyWords.end()) {
+					--i;
+				}
 			}else if(actArg=="-chromosome"){
-				if(++i>=argc || ! (chromosome= fopen(argv[i], "rb"))){
+				if(++i>=argc){
 					throw std::invalid_argument("Must specify chromosome file that can be open for reading.");
 				}
-				shouldClose.push_back(chromosome);
+				chromosome.open(argv[i], std::ios::binary);
+				if(!chromosome){
+					throw std::invalid_argument("Must specify chromosome file that can be open for reading.");
+				}
+
 			}else if(actArg=="-on"){
-				if(++i>=argc || ! (on= fopen(argv[i], "rb"))){
+				if(++i>=argc){
 					throw std::invalid_argument("Must specify image file that can be open for reading.");
 				}
-				shouldClose.push_back(on);
+				on.open(argv[i], std::ios::binary);
+				if(!on){
+					throw std::invalid_argument("Must specify image file that can be open for reading.");
+				}
+
+			}else if(actArg=="-out"){
+				if(++i>=argc){
+					throw std::invalid_argument("Must specify file that can be open for writting.");
+				}
+				out.open(argv[i], std::ios::binary);
+				if(!out){
+					throw std::invalid_argument("Must specify file that can be open for writting.");
+				}
 			}else if(actArg=="-config"){
-				if(++i>=argc || ! (chromosome= fopen(argv[i], "rb"))){
+				if(++i>=argc){
 					throw std::invalid_argument("Must specify chromosome file that can be open for reading.");
 				}
 
@@ -102,29 +136,29 @@ public:
 
 		switch (action) {
 			case TRAIN:
-				if(set.length()==0 || setOut.length()==0 || config.empty())
-					throw std::invalid_argument("-train needs: -set, -setOut, -config.");
+				if(set.size()==0 || setOut.size()==0 || config.empty() || !out)
+					throw std::invalid_argument("-train needs: -set, -setOut, -config, -out.");
 
 				break;
 			case REPAIR:
-				if(set.length()==0 || setOut.length()==0 || chromosome==nullptr || config.empty())
-					throw std::invalid_argument("-repair needs: -set, -setOut, -chromosome, -config.");
+				if(set.size()==0 || setOut.size()==0 || !chromosome || config.empty() || !out)
+					throw std::invalid_argument("-repair needs: -set, -setOut, -chromosome, -config, -out.");
 				break;
 			case DAMAGE:
-				if(chromosome==nullptr)
-					throw std::invalid_argument("-damage needs: -chromosome.");
+				if(!chromosome || !out)
+					throw std::invalid_argument("-damage needs: -chromosome, -out.");
 				break;
 			case TEST:
-				if(set.length()==0 || setOut.length()==0 || chromosome==nullptr)
+				if(set.size()==0 || setOut.size()==0 || !chromosome)
 					throw std::invalid_argument("-test needs: -set, -setOut, -chromosome.");
 				break;
 			case STATUS:
-				if(chromosome==nullptr)
+				if(!chromosome)
 					throw std::invalid_argument("-status needs: -chromosome.");
 				break;
 			case USE:
-				if(chromosome==nullptr || on==nullptr)
-					throw std::invalid_argument("-use needs: -chromosome, -on.");
+				if(!chromosome || !on || !out)
+					throw std::invalid_argument("-use needs: -chromosome, -on, -out.");
 				break;
 			case NOPE:
 				throw std::invalid_argument("No action.");
@@ -134,36 +168,31 @@ public:
 		}
 	}
 
-	~Args(){
-		for(FILE* f : shouldClose){
-			fclose(f);
-		}
-	}
-
 	/**
 	 * Prints program help to stdout.
 	 */
 	static void showHelp(){
 		std::cout << "Thank you for using "<< PROGRAM_NAME <<". "
 				<< "This program was developed at FIT BUT as project to course: Bio-Inspired Computers. \n\n"
-				<< "\t-train" <<"\n\t\tYou want to develop new edge detection filter on given training data set. Developed filter chromosome will be printed to stdout.\n"
-				<<"\t\tPROVIDE: -set, -setOut, -config\n"
-				<< "\t-repair" <<"\n\t\tIt will try to find new implementation of filter with given resources (damaged before). Developed filter chromosome will be printed to stdout.\n"
-				<<"\t\tPROVIDE: -set, -setOut, -chromosome, -config\n"
-				<< "\t-damage" <<"\n\t\tWill damage the existing filter. Randomly selects block and changes it to block with 0 output. Damaged filter chromosome will be printed to stdout.\n"
-				<<"\t\tPROVIDE: chromosome\n"
+				<< "\t-train" <<"\n\t\tYou want to develop new edge detection filter on given training data set.\n"
+				<<"\t\tPROVIDE: -set, -setOut, -config, -out\n"
+				<< "\t-repair" <<"\n\t\tIt will try to find new implementation of filter with given resources (damaged before). \n"
+				<<"\t\tPROVIDE: -set, -setOut, -chromosome, -config -out\n"
+				<< "\t-damage" <<"\n\t\tWill damage the existing filter. Randomly selects block and changes it to block with 0 output.\n"
+				<<"\t\tPROVIDE: chromosome -out\n"
 				<< "\t-test" <<"\n\t\tYou want to test your developed filter on given testing data set.\n"
 				<<"\t\tPROVIDE: -set, -setOut, -chromosome\n"
 				<< "\t-status" <<"\n\t\tChecks filter state (how much it is damaged).\n"
 				<<"\t\tPROVIDE: -chromosome\n"
 				<< "\t-use" <<"\n\t\tUse filter on given image.\n"
-				<<"\t\tPROVIDE: -chromosome -on\n"
+				<<"\t\tPROVIDE: -chromosome -on -out\n"
 
 
-				<< "\t-set" <<"\n\t\tPath to folder with train/test set (filled with jpg images).\n"
-				<< "\t-setOut" <<"\n\t\tPath to folder with required filter output. Name of image must corespond with name of input image from -set.\n"
+				<< "\t-set" <<"\n\t\tPaths to images for train/test set (filled with jpg images).\n"
+				<< "\t-setOut" <<"\n\t\tPaths to images for required filter output. Image must be on same position as coresponding image from -set.\n"
 
 				<< "\t-on" <<"\n\t\tPath to image (jpg).\n"
+				<< "\t-out" <<"\n\t\tPath to file for result.\n"
 
 				<< "\t-chromosome" <<"\n\t\tPath to saved chromosome.\n"
 				<< "\t-config" <<"\n\t\tPath to configuration file.\n"
@@ -182,36 +211,57 @@ public:
 		return action;
 	}
 
-	FILE* getChromosome() const {
+
+	Config& getConfig() {
+		return config;
+	}
+
+	std::ifstream& getChromosome() {
 		return chromosome;
 	}
 
-	const std::string& getSet() const {
+	std::ifstream& getOn() {
+		return on;
+	}
+
+	std::ofstream& getOut() {
+		return out;
+	}
+
+	const std::vector<std::string>& getSet() const {
 		return set;
 	}
 
-	const std::string& getSetOut() const {
+	const std::vector<std::string>& getSetOut() const {
 		return setOut;
-	}
-
-	const Config& getConfig() const {
-		return config;
 	}
 
 private:
 
-	std::string set; //! Path to folder with data set.
-	std::string setOut; //! Path to folder with data set ouput.
-	FILE* on=nullptr; //! Image.
-	FILE* chromosome=nullptr; //! File containing chromosome.
+	std::vector<std::string> set; //! Paths to images for data set.
+	std::vector<std::string> setOut; //! Paths to images for data set ouput.
+	std::ifstream on; //! Image.
+	std::ofstream out; //! Result.
+	std::ifstream chromosome; //! File containing chromosome.
 	Config config; //!Loaded configuration.
 
 	Action action=Action::NOPE; //! Action user wants to perform.
 
-	std::vector<FILE*> shouldClose; //! Files that we need to close in destructor.
-
 };
-
+const std::set<std::string> Args::keyWords={
+			"-train",
+			"-repair",
+			"-damage",
+			"-test",
+			"-status",
+			"-set",
+			"-setOut",
+			"-chromosome",
+			"-on",
+			"-out",
+			"-config",
+			"-h"
+};
 const char Args::PROGRAM_NAME[]="EDEF";
 
 int main(int argc, char* argv[]){
@@ -234,15 +284,98 @@ int main(int argc, char* argv[]){
 			Args::showHelp();
 			break;
 		case Args::Action::TRAIN:
+			{
+				//train new chromosome
+				Config& config=myArgs.getConfig();
+				for(auto KV : myArgs.getConfig()){
+					std::cout << KV.first << " = " << KV.second <<std::endl;
+				}
 
-			for(auto KV : myArgs.getConfig()){
-				std::cout << KV.first << " = " << KV.second <<std::endl;
+
+				const std::set<std::string> confKeys={
+						"COLS", "ROWS", "L_BACK",
+						"POPULATION_SIZE", "MAX_MUTATIONS", "GENERATIONS", "RUNS"};
+
+				for(auto k : confKeys){
+					if(config.find(k)==config.end()){
+						std::cerr << "Invalid configuration file.\n";
+						std::cerr << "\tNo key: "<< k<< std::endl;
+						return 3;
+					}
+				}
+
+				unsigned cols;
+				unsigned rows;
+				unsigned lBack;
+				unsigned populationSize;
+				unsigned maxMutations;
+				unsigned generations;
+				unsigned runs;
+
+				std::stringstream sConv;
+				sConv << config["COLS"];
+				sConv >> cols;
+				sConv.clear();
+
+				sConv << config["ROWS"];
+				sConv >> rows;
+				sConv.clear();
+
+				sConv << config["L_BACK"];
+				sConv >> lBack;
+				sConv.clear();
+
+				sConv << config["POPULATION_SIZE"];
+				sConv >> populationSize;
+				sConv.clear();
+
+				sConv << config["MAX_MUTATIONS"];
+				sConv >> maxMutations;
+				sConv.clear();
+
+				sConv << config["GENERATIONS"];
+				sConv >> generations;
+				sConv.clear();
+
+				sConv << config["RUNS"];
+				sConv >> runs;
+				sConv.clear();
+
+				std::cout << runs <<std::endl;
+
+				CGP cgp(cols, rows, lBack);
+				cgp.setPopulationSize(populationSize);
+				cgp.setMutationMax(maxMutations);
+				cgp.setGenerations(generations);
+
+				//evolve chromosome
+
+				//load images
+				std::cout << "Load train set." << std::endl;
+				std::vector<Image> train;
+				for(auto iPath: myArgs.getSet()){
+					train.push_back(std::move(Image(iPath)));
+				}
+				std::cout << "\tLOADED" << std::endl;
+
+				std::cout << "Load train setOut." << std::endl;
+				std::vector<Image> trainOut;
+				for (auto iPath : myArgs.getSetOut()) {
+					trainOut.push_back(std::move(Image(iPath)));
+				}
+				std::cout << "\tLOADED" << std::endl;
+
+				std::cout << "Start " << runs << " evolution runs." << std::endl;
+				//perform evolution
+				Chromosome c=cgp.evolve(runs, train, trainOut);
+
+				std::cout << "Saving chromosome." << std::endl;
+				//save chromosome
+				for(auto g : c){
+					myArgs.getOut()<< g;
+				}
+				std::cout << "\tSAVED" << std::endl;
 			}
-
-
-
-
-
 			break;
 		case Args::Action::REPAIR:
 

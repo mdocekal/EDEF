@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 #include <string>
+#include <vector>
 
 /**
  * Representation of image.
@@ -42,8 +43,6 @@ public:
 	void load(const std::string& path);
 
 
-	~Image();
-
 	int getBytesPerPixel() const {
 		return bytesPerPixel;
 	}
@@ -52,7 +51,7 @@ public:
 		return height;
 	}
 
-	uint8_t* getPixels() const {
+	const std::vector<uint8_t>& getPixels() const {
 		return pixels;
 	}
 
@@ -60,12 +59,16 @@ public:
 		return width;
 	}
 
+	const std::string& getPath() const {
+		return path;
+	}
+
 private:
 	int width=0;
 	int height=0;
 	int bytesPerPixel=0;
-	uint8_t* pixels=nullptr;
-
+	std::vector<uint8_t> pixels;
+	std::string path;
 	/**
 	 * Free pixels.
 	 */

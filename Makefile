@@ -3,7 +3,7 @@
 # Autor: xdocek09
 
 CC=g++
-CFLAGS= -pedantic -Wall -Wextra -std=c++11 -g
+CFLAGS= -pedantic -Wall -Wextra -std=c++11 -g -O1
 PROGS=edef
 
 all: $(PROGS)
@@ -12,7 +12,7 @@ all: $(PROGS)
 %.o: src/%.cpp 
 	$(CC) $(CFLAGS) -c $< -o $@ 
 
-edef: Image.o Config.o main.o
+edef: Image.o Config.o CGP.o main.o
 	$(CC) $(CFLAGS) $^ -o $@ -lm
 
 clean:
