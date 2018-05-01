@@ -2,7 +2,7 @@
  * Project: EDEF
  * @file CGP.h
  * @date 30. 4. 2018
- * @author xdocek09
+ * @author (just minor adjustments) xdocek09
  * @brief Source file for CGP (cartesian genetic programming) class.
  * Inspired from implementation provided in lecture BIN at FIT BUT.
  * https://www.fit.vutbr.cz/study/courses/BIN
@@ -12,6 +12,7 @@
 #define SRC_CGP_H_
 
 #include <random>
+#include "Image.h"
 
 
 /**
@@ -20,12 +21,38 @@
 typedef std::vector<int> Chromosome;
 
 /**
+ * Representation of whole population.
+ */
+typedef std::vector<Chromosome> Population;
+
+/**
  * Class for cartesian genetic programming.
  * Suitable for generating image filters.
  */
 class CGP {
 public:
-
+	/**
+	 * Functions for blocks.
+	 */
+	enum class Function {
+		MAX_VAL,					//! Maximum value for given range. (255)
+		IDENTITY,					//! x
+		INVERSION,					//! MAX_VAL-x
+		BIT_OR,						//! x | y
+		BIT_OR_WITH_INVERSE,		//! (MAX_VAL-x) | y
+		BIT_AND,					//! x & y
+		INVERSION_OF_BIT_AND,		//! MAX_VAL-(x&y)
+		XOR,						//! x^y
+		DIVIDING_BY_TWO,			//! x>>1
+		DIVIDING_BY_FOUR,			//! x>>2
+		MULTIPLE_DIVIDE_AND_OR,		//! (x << 4) | (y >> 4)
+		SUM,						//! x+y
+		SUM_WITH_SATURATION,		//! x+y with saturation (Example for 4 bit x: 13+5=15)
+		INT_AVG,					//! Integer average (x+y)>>1
+		MAX,						//! max(x,y)
+		MIN,						//! min(x,y)
+		DAMAGED						//! always 0	MUST STAY LAST IN ENUM
+	};
 
 	/**
 	 * CGP initialization.
@@ -34,8 +61,10 @@ public:
 	 * 	Number of columns.
 	 * @param[in] r
 	 * 	Number of rows.
+	 * @param[in] lBack
+	 * 	CGP lBack parameter.
 	 */
-	CGP(const unsigned c, const unsigned r);
+	CGP(const unsigned c, const unsigned r, const unsigned lBack);
 
 	/**
 	 * Evolve chromosome.
@@ -51,8 +80,7 @@ public:
 	 * @return Evolved chromosome of a filter.
 	 */
 	Chromosome evolve(const unsigned generations, const unsigned runs,
-			const std::vector<Image>& train, const std::vector<Image>& trainOut);
-
+				const std::vector<Image> & train, const std::vector<Image> & trainOut);
 
 
 	unsigned getCols() const {
@@ -61,6 +89,7 @@ public:
 
 	void setCols(unsigned cols) {
 		this->cols = cols;
+		calcColVals();
 	}
 
 	unsigned getBack() const {
@@ -69,6 +98,7 @@ public:
 
 	void setBack(unsigned back = 1) {
 		lBack = back;
+		calcColVals();
 	}
 
 	unsigned getMutationMax() const {
@@ -93,6 +123,7 @@ public:
 
 	void setRows(unsigned rows) {
 		this->rows = rows;
+		calcColVals();
 	}
 
 private:
@@ -106,6 +137,70 @@ private:
 	static const unsigned PARAM_OUT=1;	//! Number of outpus.
 
 	std::mt19937 randGen;	//! Random number generator.
+
+	std::vector<std::vector<int>> colVal; //! Pre calculated posible values of inputs for columns
+
+	std::vector<u_int8_t> outputs; //! tmp cache for block outputs when filter is applied.
+
+
+	/**
+	 * Prepare posible input values for each column.
+	 */
+	void calcColVals();
+
+
+	/**
+	 * Evaluates given population.
+	 *
+	 * @param[in] population
+	 * 	Population for evaluation.
+	 * @param[out] bestFitness
+	 * 	Fitness of best individual.
+	 * @param[out] bestIndex
+	 * 	Index of best individual in population.
+	 * @param[in] train
+	 * 	Train images that will be used as input for filter.
+	 * @param[in] trainOut
+	 * 	Train images that will be used for filter evaluation. (Desired result)
+	 */
+	static void evaluate(const Population& population, unsigned& bestFitness, unsigned& bestIndex,
+			const std::vector<Image>& train, const std::vector<Image>& trainOut);
+
+	/**
+	 * Calculates fitness for given chromosome.
+	 *
+	 * @param[in] c
+	 * 	Chromosome for fitness checking.
+	 * @param[in] train
+	 * 	Train images that will be used as input for filter.
+	 * @param[in] trainOut
+	 * 	Train images that will be used for filter evaluation. (Desired result)
+	 * @return Chromosome fitness on training data.
+	 */
+	static u_int64_t fitness(const Chromosome& c, const std::vector<Image>& train, const std::vector<Image>& trainOut);
+
+	/**
+	 * Apply filter.
+	 *
+	 * @param[in] c
+	 * 	Filter representation by chromosome.
+	 * @param[in] usedBlocks
+	 * 	Indexes of used blocks.
+	 * @param[in] input
+	 * 	Filter inputs.
+	 * @return Result of filter
+	 */
+	static uint8_t apply(const Chromosome&c, const std::set<unsigned>& usedBlocks, const std::vector<uint8_t>& inputs);
+
+	/**
+	 * Get used blocks in chromosome.
+	 *
+	 * @param[in] c
+	 * 	Chromosome.
+	 * @return List of used block indexes. (first block index is PARAM_IN)
+	 */
+	static std::set<unsigned> usedBlocks(const Chromosome&c);
+
 
 };
 

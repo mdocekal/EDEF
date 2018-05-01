@@ -48,7 +48,7 @@ public:
 		return bytesPerPixel;
 	}
 
-	int getHeight() const {
+	unsigned getHeight() const {
 		return height;
 	}
 
@@ -56,7 +56,7 @@ public:
 		return pixels;
 	}
 
-	int getWidth() const {
+	unsigned getWidth() const {
 		return width;
 	}
 

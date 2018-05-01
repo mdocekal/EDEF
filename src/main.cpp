@@ -218,9 +218,15 @@ int main(int argc, char* argv[]){
 	try {
 		Args myArgs(argc, argv);
 
-		Image img("data/pictures/download/test/3096.jpg");
+		Image img("data/test.jpg");
 
 		std::cout << img.getWidth() << ", " << img.getHeight() << ", "  << img.getBytesPerPixel() <<std::endl;
+		for(unsigned y=0; y<img.getHeight(); ++y){
+			for(unsigned x=0; x<img.getWidth(); ++x){
+				std::cout << static_cast<unsigned>(img.getPixels()[y*img.getWidth()+x]) << " ";
+			}
+			std::cout << std::endl;
+		}
 
 		switch (myArgs.getAction()) {
 		case Args::Action::HELP:
