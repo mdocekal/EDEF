@@ -26,7 +26,7 @@ inline void CGP::calcColVals(){
 	colVal.resize(cols);
 
 	for (unsigned i = 0; i < cols; i++) {
-
+		//std::cout << "GENERATE COL " << i << std::endl;
 		int minidx = rows * (i - lBack) + PARAM_IN;	//index of first reachable block output
 		if (minidx < static_cast<long>(PARAM_IN))
 			minidx = PARAM_IN; //block outputs are from PARAM_IN to PARAM_IN+cols*rows
@@ -37,8 +37,10 @@ inline void CGP::calcColVals(){
 		unsigned j = 0;
 		for (unsigned k = 0; k < PARAM_IN; k++, j++) //inserting indexes of inputs
 			colVal[i][j] = k;
+
 		for (unsigned k = minidx; k < maxidx; k++, j++) //inserting indexes of posible block outputs
 			colVal[i][j] = k;
+
 	}
 }
 
@@ -70,7 +72,6 @@ inline uint8_t CGP::apply(const Chromosome&c, const std::set<unsigned>& usedBloc
 		}else{
 			y=outputs[in2-PARAM_IN];
 		}
-
 		//evaluate block
 		switch (f) {
 			case Function::MAX_VAL:
@@ -151,8 +152,20 @@ inline std::set<unsigned> CGP::usedBlocks(const Chromosome&c){
 	//start from output
 	process.push(c[c.size()-1]);
 
+	//std::cout << "used blocks:" <<std::endl;
+	//std::cout << "\t chromosome "<< c.size() <<":" <<std::endl;
+	/*
+	unsigned cnt=0;
+	for(auto a :c){
+		if(cnt++%3 ==0)std::cout <<PARAM_IN+(cnt/3) <<": ";
+		std::cout << a << " ";
+		if(cnt%3 ==0)std::cout <<", ";
+	}*/
+	//std::cout << std::endl;
 	while(!process.empty()){
+		//std::cout << "\t proc: " << process.front() <<std::endl;
 		if(process.front()>=PARAM_IN){
+			//std::cout << "\t is block: " << process.front() <<std::endl;
 			//its block, not just input
 			used.insert(process.front());
 			process.push(c[(process.front()-PARAM_IN)*CHROMOSOME_BLOCK_SIZE]);		//first input
@@ -166,25 +179,26 @@ inline std::set<unsigned> CGP::usedBlocks(const Chromosome&c){
 
 inline u_int64_t CGP::fitness(const Chromosome& c, const std::vector<Image>& train, const std::vector<Image>& trainOut){
 	u_int64_t fitness=0;
-
+	//std::cout << "\tfitness"<<std::endl;
 	//apply filter on Image
 	//filter interpretation
 	std::set<unsigned> usedB=usedBlocks(c);
 
 	std::vector<uint8_t> inputs(PARAM_IN);
-	std::vector<uint8_t> resImage;
+	static std::vector<uint8_t> resImage;
 
 	unsigned selectedImage=0;
 	for(const Image& img: train){
+		/*
 		std::cout << "Evaluate chromosome on: " << img.getPath() <<std::endl;
 		std::cout << "\twidth:" << img.getWidth() <<std::endl;
-		std::cout << "\theight:" << img.getHeight() <<std::endl;
+		std::cout << "\theight:" << img.getHeight() <<std::endl;*/
 		if(img.getHeight()==0 || img.getWidth()==0) continue;
 		const std::vector<uint8_t>& px=img.getPixels();
 		//for every image
 		resImage.resize(img.getHeight()*img.getWidth());
 
-		std::cout << "\tedges"<<std::endl;
+		//std::cout << "\tedges"<<std::endl;
 		//do the edges
 		for(unsigned y=0; y<img.getHeight(); ++y){
 			for(unsigned x=0; x<img.getWidth(); ++x){
@@ -202,8 +216,8 @@ inline u_int64_t CGP::fitness(const Chromosome& c, const std::vector<Image>& tra
 						//fix offset according to actual position
 						if(useX<0) useX=0;
 						if(useX>=img.getWidth()) useX=img.getWidth()-1;
-						std::cout<< y*img.getWidth()+x << std::endl;
-						std::cout << "\t"<< static_cast<unsigned>(img.getPixels()[0]) << std::endl;
+						//std::cout<< y*img.getWidth()+x << std::endl;
+						//std::cout << "\t"<< static_cast<unsigned>(img.getPixels()[0]) << std::endl;
 						inputs[cnt++]=px[y*img.getWidth()+x];
 					}
 				}
@@ -214,26 +228,27 @@ inline u_int64_t CGP::fitness(const Chromosome& c, const std::vector<Image>& tra
 				if(y!=0 && y!=img.getHeight()-1) x=img.getWidth()-1; //jump
 			}
 		}
-		std::cout << "\trest"<<std::endl;
+		//std::cout << "\trest"<<std::endl;
 		//the rest
 		for(unsigned y=1; y<img.getHeight()-1; ++y){
 			for(unsigned x=1; x<img.getWidth()-1; ++x){
 				//get inputs
-				inputs[0]=px[x-(y-1)*img.getWidth()-1];
-				inputs[1]=px[x-(y-1)*img.getWidth()];
-				inputs[2]=px[x-(y-1)*img.getWidth()+1];
+				//std::cout << y << "/" << img.getHeight() << " " << x <<"/" <<img.getWidth() <<std::endl;
+				inputs[0]=px[x+(y-1)*img.getWidth()-1];
+				inputs[1]=px[x+(y-1)*img.getWidth()];
+				inputs[2]=px[x+(y-1)*img.getWidth()+1];
 				inputs[3]=px[x-1];
 				inputs[4]=px[x];
 				inputs[5]=px[x+1];
 				inputs[6]=px[x+(y+1)*img.getWidth()-1];
 				inputs[7]=px[x+(y+1)*img.getWidth()];
 				inputs[8]=px[x+(y+1)*img.getWidth()+1];
-
 				//apply filter on given inputs
 				resImage[y*img.getWidth()+x]=apply(c, usedB, inputs);
 
 			}
 		}
+		//std::cout << "\tevaluate results"<<std::endl;
 		auto pxRight=trainOut[selectedImage].getPixels();
 		//evaluate the result
 		for(unsigned y=0; y<img.getHeight(); ++y){
@@ -253,9 +268,9 @@ inline u_int64_t CGP::fitness(const Chromosome& c, const std::vector<Image>& tra
 	return fitness;
 }
 
-inline void CGP::evaluate(const Population& population, unsigned& bestFitness, unsigned& bestIndex,
+inline void CGP::evaluate(const Population& population, u_int64_t& bestFitness, unsigned& bestIndex,
 		const std::vector<Image>& train, const std::vector<Image>& trainOut){
-	bestFitness=0;
+	bestFitness=std::numeric_limits<u_int64_t>::max();
 	bestIndex=0;
 
 	//evaluate and find the best one
@@ -263,25 +278,26 @@ inline void CGP::evaluate(const Population& population, unsigned& bestFitness, u
 		unsigned actF=fitness(population[i], train, trainOut);
 		if(actF<bestFitness){	//lower is better
 			bestFitness=actF;
-			bestIndex=0;
+			bestIndex=i;
 		}
 	}
 }
 
 inline void CGP::mutate(Chromosome& c){
 	std::uniform_int_distribution<std::mt19937::result_type> distMutations(1, mutationMax);
-	std::uniform_int_distribution<std::mt19937::result_type> distOutputs(0,rows*cols+PARAM_IN);
+	std::uniform_int_distribution<std::mt19937::result_type> distOutputs(0,rows*cols+PARAM_IN-1);
 	std::uniform_int_distribution<std::mt19937::result_type> distIndex(0,c.size()-1);
 
 	unsigned gens = distMutations(randGen);   //number of gens for mutations
 	for (unsigned j = 0; j < gens; ++j) {
 		unsigned i = distIndex(randGen); //select chromosome index for mutation
-		unsigned col = (i / rows*CHROMOSOME_BLOCK_SIZE);
-
-		std::uniform_int_distribution<std::mt19937::result_type> dist(0,colVal[col].size());
 
 		if (i < rows*cols*CHROMOSOME_BLOCK_SIZE) {
+
 			//block mutation
+			unsigned col = (i / (rows*CHROMOSOME_BLOCK_SIZE));
+			//std::cout << "mutate gen " << i << " col " << col << std::endl;
+			std::uniform_int_distribution<std::mt19937::result_type> dist(0,colVal[col].size()-1);
 			if ((i % CHROMOSOME_BLOCK_SIZE) < 2) {
 				//block input mutation
 				c[i]=colVal[col][dist(randGen)];
@@ -302,32 +318,35 @@ inline void CGP::mutate(Chromosome& c){
 Chromosome CGP::evolve(const unsigned runs,
 			const std::vector<Image>& train, const std::vector<Image>& trainOut){
 
-	unsigned bestFitness;	//best fitness
+	u_int64_t bestFitness;	//best fitness
 	unsigned bestIndex;	//index of best in population
 	Chromosome theMVP;	//best chromosome so far
 
 
 	//distribution for connecting outputs
-	std::uniform_int_distribution<std::mt19937::result_type> distOutputs(0,rows*cols+PARAM_IN);
+	std::uniform_int_distribution<std::mt19937::result_type> distOutputs(0,rows*cols+PARAM_IN-1);
 	//run evolution multiple times
 	for (unsigned run=0; run < runs; run++) {
 		std::cout << "Evolution run: " << run << std::endl;
 		//create initial population
-		Population population;
-		population.resize(populationSize);
+		Population population(populationSize);
 
-		std::cout << "\tGenerate intial population."<< std::endl;
+		//std::cout << "\tGenerate intial population."<< std::endl;
 		for (unsigned i = 0; i < populationSize; i++) {
 			//for i-th chromosome
 			for(unsigned actColumn=0; actColumn< cols; ++actColumn){
-				std::uniform_int_distribution<std::mt19937::result_type> dist(0,colVal[actColumn].size());
+				std::uniform_int_distribution<std::mt19937::result_type> dist(0,colVal[actColumn].size()-1);
 				for (unsigned r = 0; r < rows; ++r) {
 					//one block
 
 					//first input
-					population[i].push_back(colVal[actColumn][dist(randGen)]);
+					unsigned ra=dist(randGen);
+					//std::cout << "\tFI col "<< actColumn << ", rand " <<ra << " val " <<colVal[actColumn][ra] << std::endl;
+					population[i].push_back(colVal[actColumn][ra]);
 					//second input
-					population[i].push_back(colVal[actColumn][dist(randGen)]);
+					ra=dist(randGen);
+					//std::cout << "\tSI col "<< actColumn << ", rand " <<ra << " val " <<colVal[actColumn][ra] << std::endl;
+					population[i].push_back(colVal[actColumn][ra]);
 					//function
 
 					if(damaged.find(PARAM_IN+population[i].size()/CHROMOSOME_BLOCK_SIZE)==damaged.end()){
@@ -354,21 +373,25 @@ Chromosome CGP::evolve(const unsigned runs,
 		//evolution
 		for(unsigned actGen=0; actGen<generations; ++actGen){
 			//mutate the best
+			//std::cout << "\t\tmutate."<< std::endl;
 			for (unsigned i=0; i < populationSize;  i++) {
 				population[i]=theMVP;
 				mutate(population[i]);
 			}
 
 			//evaluate population
-
-			unsigned tmpBestFitness;
+			//std::cout << "\t\tevaluate."<< std::endl;
+			u_int64_t tmpBestFitness;
 			unsigned tmpBestIndex;
 			evaluate(population, tmpBestFitness, tmpBestIndex, train, trainOut);
-			if(tmpBestFitness>=bestFitness){
+			if(tmpBestFitness<=bestFitness){
 				//we searched at least as good individual as actual MVP
 				//so change it
 				//(Equal is because of diversity)
 				theMVP=population[tmpBestIndex];
+				bestFitness=tmpBestFitness;
+				bestIndex=tmpBestIndex;
+
 			}
 		}
 

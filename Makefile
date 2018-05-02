@@ -3,7 +3,7 @@
 # Autor: xdocek09
 
 CC=g++
-CFLAGS= -pedantic -Wall -Wextra -std=c++11 -g -O1
+CFLAGS= -pedantic -Wall -Wextra -std=c++11 -g -O2
 PROGS=edef
 
 all: $(PROGS)

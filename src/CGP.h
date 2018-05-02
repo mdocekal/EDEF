@@ -186,7 +186,7 @@ private:
 	 * @param[in] trainOut
 	 * 	Train images that will be used for filter evaluation. (Desired result)
 	 */
-	void evaluate(const Population& population, unsigned& bestFitness, unsigned& bestIndex,
+	void evaluate(const Population& population, u_int64_t& bestFitness, unsigned& bestIndex,
 			const std::vector<Image>& train, const std::vector<Image>& trainOut);
 
 	/**
