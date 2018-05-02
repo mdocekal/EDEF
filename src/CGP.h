@@ -21,7 +21,7 @@
 /**
  * Representation of chromosome.
  */
-typedef std::vector<unsigned> Chromosome;
+typedef std::vector<u_int32_t> Chromosome;
 
 /**
  * Representation of whole population.
@@ -64,6 +64,16 @@ public:
 	 * 	Number of columns.
 	 * @param[in] r
 	 * 	Number of rows.
+	 */
+	CGP(const unsigned c, const unsigned r);
+
+	/**
+	 * CGP initialization.
+	 *
+	 * @param[in] c
+	 * 	Number of columns.
+	 * @param[in] r
+	 * 	Number of rows.
 	 * @param[in] lBack
 	 * 	CGP lBack parameter.
 	 */
@@ -83,6 +93,52 @@ public:
 	Chromosome evolve(const unsigned runs,
 				const std::vector<Image> & train, const std::vector<Image> & trainOut);
 
+	/**
+	 * Use filter on image.
+	 *
+	 * @param[in] c
+	 * 	Chromosome representation of filter.
+	 * @param[in] img
+	 * 	The image for processing.
+
+	 * @return
+	 * 	Result of filter.
+	 */
+	Image useFilter(Chromosome c, const Image& img);
+
+	/**
+	 * Use filter on image.
+	 *
+	 * @param[in] c
+	 * 	Chromosome representation of filter.
+	 * @param[in] img
+	 * 	The image for processing.
+	 * @param[out] resImage
+	 *  Result of filter.
+	 * @param[in] usedB
+	 *  Used blocks in chromosome
+	 */
+	void useFilter(Chromosome c, const Image& img, std::vector<uint8_t>& resImage, const std::set<unsigned>& usedB);
+
+
+	/**
+	 * Get used blocks in chromosome.
+	 *
+	 * @param[in] c
+	 * 	Chromosome.
+	 * @return List of used block indexes. (first block index is PARAM_IN)
+	 */
+	static std::set<unsigned> usedBlocks(const Chromosome&c);
+
+	/**
+	 * Damages block on given index.
+	 *
+	 * @param[in|out] c
+	 * 	Chromosome you want to damage.
+	 * @param[in] idx
+	 *  Index of block you want to damage.
+	 */
+	static void damageBlock(Chromosome&c, unsigned idx);
 
 	unsigned getCols() const {
 		return cols;
@@ -144,6 +200,9 @@ public:
 		this->generations = generations;
 	}
 
+	static const unsigned PARAM_IN=9;	//! Number of inputs. (9-> 3x3 kernel)
+	static const unsigned PARAM_OUT=1;	//! Number of outpus.
+	static const unsigned CHROMOSOME_BLOCK_SIZE=3; //!number of integers representing one block in chromosome
 private:
 	unsigned cols;	//! cols in CGP matrix
 	unsigned rows;	//! rows in CGP matrix
@@ -152,8 +211,7 @@ private:
 	unsigned mutationMax=3; //! maximum number of mutations for one mutation
 	unsigned lBack=1; //! CGP lBack parameter
 
-	static const unsigned PARAM_IN=9;	//! Number of inputs. (9-> 3x3 kernel)
-	static const unsigned PARAM_OUT=1;	//! Number of outpus.
+
 
 	std::mt19937 randGen;	//! Random number generator.
 
@@ -215,14 +273,7 @@ private:
 	 */
 	uint8_t apply(const Chromosome&c, const std::set<unsigned>& usedBlocks, const std::vector<uint8_t>& inputs);
 
-	/**
-	 * Get used blocks in chromosome.
-	 *
-	 * @param[in] c
-	 * 	Chromosome.
-	 * @return List of used block indexes. (first block index is PARAM_IN)
-	 */
-	static std::set<unsigned> usedBlocks(const Chromosome&c);
+
 
 	/**
 	 * Mutatates given chromosome

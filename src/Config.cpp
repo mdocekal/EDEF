@@ -8,6 +8,7 @@
 
 #include "Config.h"
 #include <sstream>
+#include <set>
 
 void Config::read(std::istream& input){
 
@@ -23,6 +24,47 @@ void Config::read(std::istream& input){
 
 	  }
 	}
+
+	static const std::set<std::string> confKeys={
+							"COLS", "ROWS", "L_BACK",
+							"POPULATION_SIZE", "MAX_MUTATIONS", "GENERATIONS", "RUNS"};
+
+	for(auto k : confKeys){
+		if(this->find(k)==this->end()){
+			std::string msg("Invalid configuration file.\n\tNo key: ");
+			msg+=k;
+			throw std::runtime_error(msg);
+		}
+	}
+
+	std::stringstream sConv;
+	sConv << data["COLS"];
+	sConv >> cols;
+	sConv.clear();
+
+	sConv << data["ROWS"];
+	sConv >> rows;
+	sConv.clear();
+
+	sConv << data["L_BACK"];
+	sConv >> lBack;
+	sConv.clear();
+
+	sConv << data["POPULATION_SIZE"];
+	sConv >> populationSize;
+	sConv.clear();
+
+	sConv << data["MAX_MUTATIONS"];
+	sConv >> maxMutations;
+	sConv.clear();
+
+	sConv << data["GENERATIONS"];
+	sConv >> generations;
+	sConv.clear();
+
+	sConv << data["RUNS"];
+	sConv >> runs;
+	sConv.clear();
 }
 
 

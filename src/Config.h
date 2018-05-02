@@ -30,6 +30,7 @@ public:
 	 * Creates Config from given stream.
 	 *
 	 * @param[in] input	With configuration.
+	 * @throw std::runtime_error when config is invalid
 	 */
 	Config(std::istream& input){
 		read(input);
@@ -40,6 +41,7 @@ public:
 	 * Old configuration is forgotten.
 	 *
 	 * @param[in] input	input	With configuration.
+	 * @throw std::runtime_error when config is invalid
 	 */
 	void read(std::istream& input);
 
@@ -136,9 +138,44 @@ public:
 		return data.empty();
 	}
 
+	uint32_t getCols() const {
+		return cols;
+	}
+
+	unsigned getGenerations() const {
+		return generations;
+	}
+
+	unsigned getlBack() const {
+		return lBack;
+	}
+
+	unsigned getMaxMutations() const {
+		return maxMutations;
+	}
+
+	unsigned getPopulationSize() const {
+		return populationSize;
+	}
+
+	uint32_t getRows() const {
+		return rows;
+	}
+
+	unsigned getRuns() const {
+		return runs;
+	}
 
 private:
 	std::map<std::string, std::string> data; //! Loaded configuration
+
+	uint32_t cols;
+	uint32_t rows;
+	unsigned lBack;
+	unsigned populationSize;
+	unsigned maxMutations;
+	unsigned generations;
+	unsigned runs;
 };
 
 #endif /* SRC_CONFIG_H_ */

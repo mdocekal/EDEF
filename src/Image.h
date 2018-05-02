@@ -26,6 +26,19 @@ public:
 	Image(){};
 
 	/**
+	 * Creates image from data.
+	 * Only one byte pet pixel
+	 *
+	 * @param[in] w
+	 * 	Width
+	 * @param[in] h
+	 * 	Height
+	 * @param[in] p
+	 * 	Image pixels.
+	 */
+	Image(unsigned w, unsigned h, const std::vector<uint8_t>& p);
+
+	/**
 	 * Creates image from file.
 	 *
 	 * @param[in] path	to file containing jpg image.
@@ -41,6 +54,28 @@ public:
 	 * @throw std::runtime_error	When image is invalid.
 	 */
 	void load(const std::string& path);
+
+	/**
+	 * Saves image into file.
+	 *
+	 * @param[in] path
+	 * 	Path to file.
+	 * @throw std::runtime_error	When image could not be saved.
+	 */
+	void save(const std::string& path);
+
+	/**
+	 * Fills image with data.
+	 * Only one byte pet pixel
+	 *
+	 * @param[in] w
+	 * 	Width
+	 * @param[in] h
+	 * 	Height
+	 * @param[in] p
+	 * 	Image pixels.
+	 */
+	void setData(unsigned w, unsigned h, const std::vector<uint8_t>& p);
 
 
 	int getBytesPerPixel() const {

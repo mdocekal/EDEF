@@ -63,7 +63,7 @@ public:
 			}else if(actArg=="-status"){
 				if(action!=NOPE) throw std::invalid_argument("You can not select multiple actions.");
 				action=STATUS;
-			}else if(actArg=="-status"){
+			}else if(actArg=="-use"){
 				if(action!=NOPE) throw std::invalid_argument("You can not select multiple actions.");
 				action=USE;
 			}else if(actArg=="-set"){
@@ -98,19 +98,13 @@ public:
 				if(++i>=argc){
 					throw std::invalid_argument("Must specify image file that can be open for reading.");
 				}
-				on.open(argv[i], std::ios::binary);
-				if(!on){
-					throw std::invalid_argument("Must specify image file that can be open for reading.");
-				}
+				on=argv[i];
 
 			}else if(actArg=="-out"){
 				if(++i>=argc){
 					throw std::invalid_argument("Must specify file that can be open for writting.");
 				}
-				out.open(argv[i], std::ios::binary);
-				if(!out){
-					throw std::invalid_argument("Must specify file that can be open for writting.");
-				}
+				out=argv[i];
 			}else if(actArg=="-config"){
 				if(++i>=argc){
 					throw std::invalid_argument("Must specify chromosome file that can be open for reading.");
@@ -136,16 +130,16 @@ public:
 
 		switch (action) {
 			case TRAIN:
-				if(set.size()==0 || setOut.size()==0 || config.empty() || !out)
+				if(set.size()==0 || setOut.size()==0 || config.empty() || out.size()==0)
 					throw std::invalid_argument("-train needs: -set, -setOut, -config, -out.");
 
 				break;
 			case REPAIR:
-				if(set.size()==0 || setOut.size()==0 || !chromosome || config.empty() || !out)
+				if(set.size()==0 || setOut.size()==0 || !chromosome || config.empty() || out.size()==0)
 					throw std::invalid_argument("-repair needs: -set, -setOut, -chromosome, -config, -out.");
 				break;
 			case DAMAGE:
-				if(!chromosome || !out)
+				if(!chromosome || out.size()==0)
 					throw std::invalid_argument("-damage needs: -chromosome, -out.");
 				break;
 			case TEST:
@@ -157,7 +151,7 @@ public:
 					throw std::invalid_argument("-status needs: -chromosome.");
 				break;
 			case USE:
-				if(!chromosome || !on || !out)
+				if(!chromosome || on.size()==0 || out.size()==0)
 					throw std::invalid_argument("-use needs: -chromosome, -on, -out.");
 				break;
 			case NOPE:
@@ -179,7 +173,7 @@ public:
 				<< "\t-repair" <<"\n\t\tIt will try to find new implementation of filter with given resources (damaged before). \n"
 				<<"\t\tPROVIDE: -set, -setOut, -chromosome, -config -out\n"
 				<< "\t-damage" <<"\n\t\tWill damage the existing filter. Randomly selects block and changes it to block with 0 output.\n"
-				<<"\t\tPROVIDE: chromosome -out\n"
+				<<"\t\tPROVIDE: -chromosome -out\n"
 				<< "\t-test" <<"\n\t\tYou want to test your developed filter on given testing data set.\n"
 				<<"\t\tPROVIDE: -set, -setOut, -chromosome\n"
 				<< "\t-status" <<"\n\t\tChecks filter state (how much it is damaged).\n"
@@ -220,11 +214,11 @@ public:
 		return chromosome;
 	}
 
-	std::ifstream& getOn() {
+	std::string& getOn() {
 		return on;
 	}
 
-	std::ofstream& getOut() {
+	std::string& getOut() {
 		return out;
 	}
 
@@ -240,8 +234,8 @@ private:
 
 	std::vector<std::string> set; //! Paths to images for data set.
 	std::vector<std::string> setOut; //! Paths to images for data set ouput.
-	std::ifstream on; //! Image.
-	std::ofstream out; //! Result.
+	std::string on; //! Image path.
+	std::string out; //! Result.
 	std::ifstream chromosome; //! File containing chromosome.
 	Config config; //!Loaded configuration.
 
@@ -264,11 +258,64 @@ const std::set<std::string> Args::keyWords={
 };
 const char Args::PROGRAM_NAME[]="EDEF";
 
+/**
+ * Loads chromosome from file.
+ *
+ * @param[in] f
+ * 	File with chromosome.
+ * @param[out] c
+ * 	Loaded chromosome.
+ * @param[out] cols
+ *  Loaded number of cols.
+ * @param[out] rows
+ *	Loaded number of rows.
+ */
+inline void loadChromosome(std::ifstream& f, Chromosome& c, u_int32_t& cols, u_int32_t& rows){
+	f.read(reinterpret_cast<char *>(&cols), sizeof(cols));
+	f.read(reinterpret_cast<char *>(&rows), sizeof(rows));
+	c.resize(CGP::CHROMOSOME_BLOCK_SIZE*cols*rows+1);
+	f.read(reinterpret_cast<char *>(&c[0]), sizeof(u_int32_t)*(CGP::CHROMOSOME_BLOCK_SIZE*cols*rows+1));
+
+}
+
+/**
+ * Save chromosome to file.
+ *
+ * @param[in] path
+ * 	Path to file for saving.
+ * @param[in] c
+ * 	Chromosome for saving.
+ * @param[in] cols
+ *  Cols for saving.
+ * @param[in] rows
+ * 	Rows for saving.
+ */
+inline void saveChromosome(std::string& path, Chromosome& c, u_int32_t cols, u_int32_t rows){
+	std::ofstream f(path, std::ios::binary);
+	if (!f) {
+		throw std::invalid_argument(
+				"Must specify chromosome file that can be open for writting.");
+	}
+
+	u_int32_t val = cols;
+	f.write(reinterpret_cast<const char *>(&val), sizeof(val));
+	val = rows;
+	f.write(reinterpret_cast<const char *>(&val), sizeof(val));
+
+	for (auto g : c) {
+		f.write(reinterpret_cast<const char *>(&g), sizeof(g));
+	}
+
+}
+
 int main(int argc, char* argv[]){
 	try {
 		Args myArgs(argc, argv);
+		Config& config=myArgs.getConfig();
+		//read config
 
-		/*Image img("data/test.jpg");
+/*
+		Image img("data/test.jpg");
 
 		std::cout << img.getWidth() << ", " << img.getHeight() << ", "  << img.getBytesPerPixel() <<std::endl;
 		for(unsigned y=0; y<img.getHeight(); ++y){
@@ -286,67 +333,15 @@ int main(int argc, char* argv[]){
 		case Args::Action::TRAIN:
 			{
 				//train new chromosome
-				Config& config=myArgs.getConfig();
+
 				for(auto KV : myArgs.getConfig()){
 					std::cout << KV.first << " = " << KV.second <<std::endl;
 				}
 
-
-				const std::set<std::string> confKeys={
-						"COLS", "ROWS", "L_BACK",
-						"POPULATION_SIZE", "MAX_MUTATIONS", "GENERATIONS", "RUNS"};
-
-				for(auto k : confKeys){
-					if(config.find(k)==config.end()){
-						std::cerr << "Invalid configuration file.\n";
-						std::cerr << "\tNo key: "<< k<< std::endl;
-						return 3;
-					}
-				}
-
-				unsigned cols;
-				unsigned rows;
-				unsigned lBack;
-				unsigned populationSize;
-				unsigned maxMutations;
-				unsigned generations;
-				unsigned runs;
-
-				std::stringstream sConv;
-				sConv << config["COLS"];
-				sConv >> cols;
-				sConv.clear();
-
-				sConv << config["ROWS"];
-				sConv >> rows;
-				sConv.clear();
-
-				sConv << config["L_BACK"];
-				sConv >> lBack;
-				sConv.clear();
-
-				sConv << config["POPULATION_SIZE"];
-				sConv >> populationSize;
-				sConv.clear();
-
-				sConv << config["MAX_MUTATIONS"];
-				sConv >> maxMutations;
-				sConv.clear();
-
-				sConv << config["GENERATIONS"];
-				sConv >> generations;
-				sConv.clear();
-
-				sConv << config["RUNS"];
-				sConv >> runs;
-				sConv.clear();
-
-				std::cout << runs <<std::endl;
-
-				CGP cgp(cols, rows, lBack);
-				cgp.setPopulationSize(populationSize);
-				cgp.setMutationMax(maxMutations);
-				cgp.setGenerations(generations);
+				CGP cgp(config.getCols(), config.getRows(), config.getlBack());
+				cgp.setPopulationSize(config.getPopulationSize());
+				cgp.setMutationMax(config.getMaxMutations());
+				cgp.setGenerations(config.getGenerations());
 
 				//evolve chromosome
 
@@ -365,25 +360,158 @@ int main(int argc, char* argv[]){
 				}
 				std::cout << "\tLOADED" << std::endl;
 
-				std::cout << "Start " << runs << " evolution runs." << std::endl;
+				std::cout << "Start " << config.getRuns() << " evolution runs." << std::endl;
+
+
 				//perform evolution
-				Chromosome c=cgp.evolve(runs, train, trainOut);
+				Chromosome c=cgp.evolve(config.getRuns(), train, trainOut);
+				/*cgp.setGenerations(1);
+				cgp.setPopulationSize(1);
+
+				std::vector<Image> setik;
+				setik.push_back(img);
+
+				Chromosome c=cgp.evolve(1, setik, setik);*/
+
 
 				std::cout << "Saving chromosome." << std::endl;
+				std::cout << "Chromosome ("<< c.size() <<"): ";
 				//save chromosome
-				for(auto g : c){
-					myArgs.getOut()<< g;
-				}
+				saveChromosome(myArgs.getOut(), c, config.getCols(), config.getRows());
 				std::cout << "\tSAVED" << std::endl;
+			}
+			break;
+		case Args::Action::USE:
+			//use given filter on given image
+			{
+				//load image
+				std::cout << "Load image." << std::endl;
+				Image img(myArgs.getOn());
+				std::cout << "\tLOADED" << std::endl;
+
+				//load chromosome
+				std::cout << "Load chromosome." << std::endl;
+				uint32_t cols;
+				uint32_t rows;
+				Chromosome c;
+				loadChromosome(myArgs.getChromosome(), c, cols, rows);
+				std::cout << "\tLOADED" << std::endl;
+
+				CGP cgp(cols, rows);
+				std::cout << "Apply filter." << std::endl;
+				Image res(cgp.useFilter(c, img));
+
+				std::cout << "Save." << std::endl;
+				res.save(myArgs.getOut());
+
 			}
 			break;
 		case Args::Action::REPAIR:
 
 			break;
 		case Args::Action::DAMAGE:
+			//damage given chromosome
+			{
+				//load chromosome
+				std::cout << "Load chromosome." << std::endl;
+				uint32_t cols;
+				uint32_t rows;
+				Chromosome c;
+				loadChromosome(myArgs.getChromosome(), c, cols, rows);
+				std::cout << "\tLOADED" << std::endl;
+
+				std::set<unsigned> usedBTmp(CGP::usedBlocks(c));
+				std::vector<unsigned> usedB;
+
+				//filter allready damaged blocks
+				for(auto idx: usedBTmp){
+					if(c[(idx-CGP::PARAM_IN)*CGP::CHROMOSOME_BLOCK_SIZE+2] != static_cast<unsigned>(CGP::Function::DAMAGED))
+						usedB.push_back(idx);
+
+				}
+				std::copy(usedBTmp.begin(), usedBTmp.end(), std::back_inserter(usedB));
+
+
+				std::mt19937 randGen;
+				randGen.seed(std::random_device()());
+
+				unsigned damage;
+
+				if(usedB.size()==0){
+					//just randomly damage any block
+					std::uniform_int_distribution<std::mt19937::result_type> dist(CGP::PARAM_IN, CGP::PARAM_IN+cols*rows-1);
+					damage=dist(randGen);
+				}else{
+					//randomly damage used block
+					std::uniform_int_distribution<std::mt19937::result_type> dist(0, usedB.size()-1);
+					damage=usedB[dist(randGen)];
+				}
+
+				CGP::damageBlock(c, damage);
+
+				std::cout << "Block "<< damage << " is damaged." << std::endl;
+				std::cout << "Saving chromosome." << std::endl;
+				//save chromosome
+				saveChromosome(myArgs.getOut(), c, cols, rows);
+				std::cout << "\tSAVED" << std::endl;
+			}
 
 			break;
-		case Args::Action::TEST:
+
+		case Args::Action::STATUS:
+			//check filter status
+			{
+				//load chromosome
+				uint32_t cols;
+				uint32_t rows;
+				Chromosome c;
+				loadChromosome(myArgs.getChromosome(), c, cols, rows);
+
+				std::cout << "Chromosome ("<< c.size() <<"): ";
+				unsigned cnt=0;
+				for(auto g :c){
+					if(cnt==c.size()-1){
+						std::cout << "Out: ";
+					}else if(cnt++%CGP::CHROMOSOME_BLOCK_SIZE ==0)std::cout <<CGP::PARAM_IN+(cnt/CGP::CHROMOSOME_BLOCK_SIZE) <<": ";
+					std::cout << g << " ";
+					if(cnt%CGP::CHROMOSOME_BLOCK_SIZE ==0)std::cout <<"| ";
+				}
+				std::cout <<std::endl;
+
+				std::set<unsigned> usedB(CGP::usedBlocks(c));
+
+				std::cout << "Blocks: "<< cols*rows <<"\n";
+				std::cout << "Used blocks ("<< usedB.size() <<"): ";
+
+				std::vector<u_int32_t> damagedUsedBlocks;
+				std::vector<u_int32_t> damagedBlocks;
+
+				for(auto uB:usedB){
+					std::cout << uB << " ";
+					if(c[(uB-CGP::PARAM_IN)*CGP::CHROMOSOME_BLOCK_SIZE+2] == static_cast<unsigned>(CGP::Function::DAMAGED)){
+						//damaged
+						damagedUsedBlocks.push_back(uB);
+					}
+				}
+				std::cout << "\nDamaged used blocks ("<< damagedUsedBlocks.size() <<"): ";
+				for(auto duB:damagedUsedBlocks){
+					std::cout << duB << " ";
+				}
+
+				for(unsigned i=2; i<c.size();i+=CGP::CHROMOSOME_BLOCK_SIZE){ //third is function
+					if(c[i] == static_cast<unsigned>(CGP::Function::DAMAGED)){
+						damagedBlocks.push_back(i/CGP::CHROMOSOME_BLOCK_SIZE+CGP::PARAM_IN);
+					}
+				}
+
+				//damaged blocks
+				std::cout << "\nDamaged blocks ("<< damagedBlocks.size() <<"): ";
+				for(auto dB:damagedBlocks){
+					std::cout << dB << " ";
+				}
+				std::cout << std::endl;
+
+			}
 
 			break;
 		default:
@@ -397,6 +525,13 @@ int main(int argc, char* argv[]){
 	} catch (const std::invalid_argument& e) {
 		std::cerr << "Arguments error: \n";
 		std::cerr << "\t" << e.what() << "\n\n";
+
+		Args::showHelp();
+
+		return 1;
+	} catch (const std::runtime_error& e) {
+		std::cerr << "Runtime error: \n";
+		std::cerr << e.what() << "\n\n";
 
 		Args::showHelp();
 
