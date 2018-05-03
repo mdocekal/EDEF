@@ -309,7 +309,7 @@ inline void CGP::useFilter(Chromosome c, const Image& img, std::vector<uint8_t>&
 
 }
 
-inline u_int64_t CGP::fitness(const Chromosome& c, const std::vector<Image>& train, const std::vector<Image>& trainOut){
+u_int64_t CGP::fitness(const Chromosome& c, const std::vector<Image>& train, const std::vector<Image>& trainOut){
 	u_int64_t fitness=0;
 	//std::cout << "\tfitness"<<std::endl;
 	//apply filter on Image
@@ -339,9 +339,6 @@ inline u_int64_t CGP::fitness(const Chromosome& c, const std::vector<Image>& tra
 
 		++selectedImage;
 	}
-
-	//todo:delete
-	//std::cout << "Fitness: " << fitness << std::endl;
 
 	return fitness;
 }

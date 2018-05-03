@@ -47,6 +47,7 @@ public:
 		//arguments parsing
 		for(int i=1; i<argc; i++){
 			std::string actArg(argv[i]);
+
 			if(actArg=="-train"){
 
 				if(action!=NOPE) throw std::invalid_argument("You can not select multiple actions.");
@@ -73,16 +74,17 @@ public:
 				while(i<argc && keyWords.find(argv[i])==keyWords.end()){
 					set.push_back(argv[i++]);
 				}
-				if(keyWords.find(argv[i])!=keyWords.end()){
+				if(i < argc && keyWords.find(argv[i])!=keyWords.end()){
 					--i;
 				}
 			}else if(actArg=="-setOut"){
 				if(++i>=argc) throw std::invalid_argument("No value for setOut.");
 				//read paths to images
+
 				while (i < argc && keyWords.find(argv[i]) == keyWords.end()) {
 					setOut.push_back(argv[i++]);
 				}
-				if (keyWords.find(argv[i]) != keyWords.end()) {
+				if (i < argc && keyWords.find(argv[i]) != keyWords.end()) {
 					--i;
 				}
 			}else if(actArg=="-chromosome"){
@@ -572,6 +574,37 @@ int main(int argc, char* argv[]){
 
 			}
 
+			break;
+		case Args::Action::TEST:
+			//test filter on given data
+			{
+				//load images
+				std::cout << "Load test set." << std::endl;
+				std::vector<Image> test;
+				for (auto iPath : myArgs.getSet()) {
+					test.push_back(std::move(Image(iPath)));
+				}
+				std::cout << "\tLOADED" << std::endl;
+
+				std::cout << "Load test setOut." << std::endl;
+				std::vector<Image> testOut;
+				for (auto iPath : myArgs.getSetOut()) {
+					testOut.push_back(std::move(Image(iPath)));
+				}
+				std::cout << "\tLOADED" << std::endl;
+
+				//load chromosome
+				std::cout << "Load chromosome." << std::endl;
+				uint32_t cols;
+				uint32_t rows;
+				Chromosome c;
+				loadChromosome(myArgs.getChromosome(), c, cols, rows);
+				std::cout << "\tLOADED" << std::endl;
+
+				CGP cgp(cols, rows);
+				std::cout << "Fitness: " << std::flush;
+				std::cout << cgp.fitness(c, test, testOut) << std::endl;
+			}
 			break;
 		default:
 			std::cerr << "Unexpected error: \n";
