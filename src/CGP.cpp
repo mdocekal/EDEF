@@ -33,7 +33,6 @@ inline void CGP::calcColVals(){
 	colVal.resize(cols);
 
 	for (unsigned i = 0; i < cols; i++) {
-		//std::cout << "GENERATE COL " << i << std::endl;
 		int minidx = rows * (i - lBack) + PARAM_IN;	//index of first reachable block output
 		if (minidx < static_cast<long>(PARAM_IN))
 			minidx = PARAM_IN; //block outputs are from PARAM_IN to PARAM_IN+cols*rows
@@ -66,9 +65,6 @@ inline uint8_t CGP::apply(const Chromosome&c, const std::set<unsigned>& usedBloc
 		unsigned in1=c[(blockIdx-PARAM_IN)*CHROMOSOME_BLOCK_SIZE];
 		unsigned in2=c[(blockIdx-PARAM_IN)*CHROMOSOME_BLOCK_SIZE+1];
 		Function f=static_cast<Function>(c[(blockIdx-PARAM_IN)*CHROMOSOME_BLOCK_SIZE+2]);
-		//std::cout << "Block " << blockIdx << " function " << static_cast<unsigned>(f) << std::endl;
-		//std::cout << "\t " << " in1: " << in1 << " in2: " << in2 << std::endl;
-
 
 		unsigned x,y;
 
@@ -86,29 +82,28 @@ inline uint8_t CGP::apply(const Chromosome&c, const std::set<unsigned>& usedBloc
 			y=outputs[in2-PARAM_IN];
 		}
 
-		//std::cout << "\t " << " x: " << x << " y: " << y << std::endl;
 		//evaluate block
 		switch (f) {
 			case Function::MAX_VAL:
-				outputs[out]=std::numeric_limits<u_int8_t>::max();
+				outputs[out]=std::numeric_limits<uint8_t>::max();
 				break;
 			case Function::IDENTITY:
 				outputs[out]=x;
 				break;
 			case Function::INVERSION:
-				outputs[out]=std::numeric_limits<u_int8_t>::max()-x;
+				outputs[out]=std::numeric_limits<uint8_t>::max()-x;
 				break;
 			case Function::BIT_OR:
 				outputs[out]=x|y;
 				break;
 			case Function::BIT_OR_WITH_INVERSE:
-				outputs[out]=(std::numeric_limits<u_int8_t>::max()-x) |y;
+				outputs[out]=(std::numeric_limits<uint8_t>::max()-x) |y;
 				break;
 			case Function::BIT_AND:
 				outputs[out]=x&y;
 				break;
 			case Function::INVERSION_OF_BIT_AND:
-				outputs[out]=std::numeric_limits<u_int8_t>::max()-(x&y);
+				outputs[out]=std::numeric_limits<uint8_t>::max()-(x&y);
 				break;
 			case Function::XOR:
 				outputs[out]=x^y;
@@ -128,10 +123,10 @@ inline uint8_t CGP::apply(const Chromosome&c, const std::set<unsigned>& usedBloc
 			case Function::SUM_WITH_SATURATION:
 				{
 					unsigned s=x+y;
-					if(std::numeric_limits<u_int8_t>::max()>s){
+					if(std::numeric_limits<uint8_t>::max()>s){
 						outputs[out]=s;
 					}else{
-						outputs[out]=std::numeric_limits<u_int8_t>::max();
+						outputs[out]=std::numeric_limits<uint8_t>::max();
 					}
 				}
 				break;
@@ -148,16 +143,12 @@ inline uint8_t CGP::apply(const Chromosome&c, const std::set<unsigned>& usedBloc
 				//DAMAGED
 				outputs[out]=0;
 		}
-
-		//std::cout << "\t " << " res: " << static_cast<unsigned>(outputs[out]) << std::endl;
 	}
 
 	if(c[c.size()-1]<PARAM_IN){
-		//std::cout << "\t " << "out connected to:"<< c[c.size()-1] << " Tot res: " << static_cast<unsigned>(inputs[c[c.size()-1]]) << std::endl;
 		//get it straight from inputs
 		return inputs[c[c.size()-1]];
 	}else{
-		//std::cout << "\t " << "out connected to:"<< c[c.size()-1] << " Tot res: " << static_cast<unsigned>(outputs[c[c.size()-1]-PARAM_IN]) << std::endl;
 		//get result from calculated output of a block
 		return outputs[c[c.size()-1]-PARAM_IN];
 	}
@@ -165,7 +156,7 @@ inline uint8_t CGP::apply(const Chromosome&c, const std::set<unsigned>& usedBloc
 }
 
 void CGP::damageBlock(Chromosome&c, unsigned idx){
-	c[(idx-PARAM_IN)*CHROMOSOME_BLOCK_SIZE+2]=static_cast<u_int32_t>(Function::DAMAGED);
+	c[(idx-PARAM_IN)*CHROMOSOME_BLOCK_SIZE+2]=static_cast<uint32_t>(Function::DAMAGED);
 }
 
 std::set<unsigned> CGP::usedBlocks(const Chromosome&c){
@@ -175,20 +166,8 @@ std::set<unsigned> CGP::usedBlocks(const Chromosome&c){
 	//start from output
 	process.push(c[c.size()-1]);
 
-	//std::cout << "used blocks:" <<std::endl;
-	//std::cout << "\t chromosome "<< c.size() <<":" <<std::endl;
-	/*
-	unsigned cnt=0;
-	for(auto a :c){
-		if(cnt++%3 ==0)std::cout <<PARAM_IN+(cnt/3) <<": ";
-		std::cout << a << " ";
-		if(cnt%3 ==0)std::cout <<", ";
-	}*/
-	//std::cout << std::endl;
 	while(!process.empty()){
-		//std::cout << "\t proc: " << process.front() <<std::endl;
 		if(process.front()>=PARAM_IN){
-			//std::cout << "\t is block: " << process.front() <<std::endl;
 			//its block, not just input
 			used.insert(process.front());
 			process.push(c[(process.front()-PARAM_IN)*CHROMOSOME_BLOCK_SIZE]);		//first input
@@ -214,6 +193,7 @@ inline void CGP::useFilter(Chromosome c, const Image& img, std::vector<uint8_t>&
 	resImage.resize(img.getHeight() * img.getWidth());
 
 	//do the edges
+	//we are extending borders
 	for (unsigned y = 0; y < img.getHeight(); ++y) {
 		for (unsigned x = 0; x < img.getWidth(); ++x) {
 
@@ -238,18 +218,6 @@ inline void CGP::useFilter(Chromosome c, const Image& img, std::vector<uint8_t>&
 				}
 			}
 
-			//todo:delete
-/*
-				std::cout << "Inputs y/x " << y << "/" << x << std::endl;
-				for(unsigned y=0; y<3; y++){
-					std::cout << "\t" << std::endl;
-					for(unsigned x=0; x<3; x++){
-						std::cout << static_cast<unsigned> (inputs[y*3+x]) << " ";
-					}
-					std::cout << std::endl;
-				}*/
-				//todo:\delete
-
 			//apply filter on given inputs
 			resImage[y * img.getWidth() + x] = apply(c, usedB, inputs);
 
@@ -261,12 +229,11 @@ inline void CGP::useFilter(Chromosome c, const Image& img, std::vector<uint8_t>&
 
 		}
 	}
-	//std::cout << "\trest"<<std::endl;
+
 	//the rest
 	for (unsigned y = 1; y < img.getHeight() - 1; ++y) {
 		for (unsigned x = 1; x < img.getWidth() - 1; ++x) {
 			//get inputs
-			//std::cout << y << "/" << img.getHeight() << " " << x <<"/" <<img.getWidth() <<std::endl;
 			inputs[0] = px[x + (y - 1) * img.getWidth() - 1];
 			inputs[1] = px[x + (y - 1) * img.getWidth()];
 			inputs[2] = px[x + (y - 1) * img.getWidth() + 1];
@@ -277,41 +244,16 @@ inline void CGP::useFilter(Chromosome c, const Image& img, std::vector<uint8_t>&
 			inputs[7] = px[x + (y + 1) * img.getWidth()];
 			inputs[8] = px[x + (y + 1) * img.getWidth() + 1];
 
-			//todo:delete
-/*
-							std::cout << "Inputs y/x " << y << "/" << x << std::endl;
-							for(unsigned y=0; y<3; y++){
-								std::cout << "\t" << std::endl;
-								for(unsigned x=0; x<3; x++){
-									std::cout << static_cast<unsigned> (inputs[y*3+x]) << " ";
-								}
-								std::cout << std::endl;
-							}*/
-							//todo:\delete
-
 			//apply filter on given inputs
 			resImage[y * img.getWidth() + x] = apply(c, usedB, inputs);
 
 		}
 	}
-
-	//todo:delete
-/*
-	std::cout << "COMPLETE RESULT" << std::endl;
-	for(unsigned y=0; y<img.getHeight(); ++y){
-				for(unsigned x=0; x<img.getWidth(); ++x){
-					std::cout << static_cast<unsigned>(resImage[y*img.getWidth()+x]) << " ";
-				}
-				std::cout << std::endl;
-			}*/
-	//todo:\delete
-
-
 }
 
-u_int64_t CGP::fitness(const Chromosome& c, const std::vector<Image>& train, const std::vector<Image>& trainOut){
-	u_int64_t fitness=0;
-	//std::cout << "\tfitness"<<std::endl;
+uint64_t CGP::fitness(const Chromosome& c, const std::vector<Image>& train, const std::vector<Image>& trainOut){
+	uint64_t fitness=0;
+
 	//apply filter on Image
 	//filter interpretation
 	std::set<unsigned> usedB=usedBlocks(c);
@@ -323,15 +265,14 @@ u_int64_t CGP::fitness(const Chromosome& c, const std::vector<Image>& train, con
 	for(const Image& img: train){
 		if (img.getHeight() == 0 || img.getWidth() == 0) continue;
 		useFilter(c, img, resImage, usedB);
-		//std::cout << "\tevaluate results"<<std::endl;
 		auto pxRight=trainOut[selectedImage].getPixels();
 		//evaluate the result
 		for(unsigned y=0; y<img.getHeight(); ++y){
 			for(unsigned x=0; x<img.getWidth(); ++x){
 				unsigned diff=abs(pxRight[y*img.getWidth()+x]-resImage[y*img.getWidth()+x]);
-				if(diff>std::numeric_limits<u_int64_t>::max()-fitness){
+				if(diff>std::numeric_limits<uint64_t>::max()-fitness){
 					//overflow
-					return std::numeric_limits<u_int64_t>::max();
+					return std::numeric_limits<uint64_t>::max();
 				}
 				fitness+=diff;
 			}
@@ -343,9 +284,9 @@ u_int64_t CGP::fitness(const Chromosome& c, const std::vector<Image>& train, con
 	return fitness;
 }
 
-inline void CGP::evaluate(const Population& population, u_int64_t& bestFitness, unsigned& bestIndex,
+inline void CGP::evaluate(const Population& population, uint64_t& bestFitness, unsigned& bestIndex,
 		const std::vector<Image>& train, const std::vector<Image>& trainOut){
-	bestFitness=std::numeric_limits<u_int64_t>::max();
+	bestFitness=std::numeric_limits<uint64_t>::max();
 	bestIndex=0;
 
 	//evaluate and find the best one
@@ -371,7 +312,6 @@ inline void CGP::mutate(Chromosome& c){
 
 			//block mutation
 			unsigned col = (i / (rows*CHROMOSOME_BLOCK_SIZE));
-			//std::cout << "mutate gen " << i << " col " << col << std::endl;
 			std::uniform_int_distribution<std::mt19937::result_type> dist(0,colVal[col].size()-1);
 			if ((i % CHROMOSOME_BLOCK_SIZE) < 2) {
 				//block input mutation
@@ -393,7 +333,7 @@ inline void CGP::mutate(Chromosome& c){
 Chromosome CGP::evolve(const unsigned runs,
 			const std::vector<Image>& train, const std::vector<Image>& trainOut){
 
-	u_int64_t bestFitness=std::numeric_limits<u_int64_t>::max();	//best fitness
+	uint64_t bestFitness=std::numeric_limits<uint64_t>::max();	//best fitness
 	Chromosome theMVP;	//best chromosome so far
 
 
@@ -406,7 +346,6 @@ Chromosome CGP::evolve(const unsigned runs,
 		//create initial population
 		Population population(populationSize);
 
-		//std::cout << "\tGenerate intial population."<< std::endl;
 		for (unsigned i = 0; i < populationSize; i++) {
 			//for i-th chromosome
 			for(unsigned actColumn=0; actColumn< cols; ++actColumn){
@@ -416,11 +355,10 @@ Chromosome CGP::evolve(const unsigned runs,
 
 					//first input
 					unsigned ra=dist(randGen);
-					//std::cout << "\tFI col "<< actColumn << ", rand " <<ra << " val " <<colVal[actColumn][ra] << std::endl;
 					population[i].push_back(colVal[actColumn][ra]);
 					//second input
 					ra=dist(randGen);
-					//std::cout << "\tSI col "<< actColumn << ", rand " <<ra << " val " <<colVal[actColumn][ra] << std::endl;
+
 					population[i].push_back(colVal[actColumn][ra]);
 					//function
 
@@ -437,23 +375,11 @@ Chromosome CGP::evolve(const unsigned runs,
 			//do not forget to connect the outputs
 			for (unsigned j = 0; j < PARAM_OUT; ++j)
 				population[i].push_back(distOutputs(randGen));
-			/*
-			std::cout << "\t chromosome "<< population[i].size() <<":" <<std::endl;
-
-			unsigned cnt=0;
-			for(auto a :population[i]){
-				if(cnt++%3 ==0)std::cout <<PARAM_IN+(cnt/3) <<": ";
-				std::cout << a << " ";
-				if(cnt%3 ==0)std::cout <<", ";
-			}
-			std::cout <<std::endl;*/
 		}
 
-
-		//std::cout << "\tEvaluate intial population of "<< population.size() << " individuals."<< std::endl;
 		//evaluate intial population
 
-		u_int64_t tmpBestFitness;
+		uint64_t tmpBestFitness;
 		unsigned tmpBestIndex;
 
 		evaluate(population, tmpBestFitness, tmpBestIndex, train, trainOut);
@@ -461,29 +387,16 @@ Chromosome CGP::evolve(const unsigned runs,
 			bestFitness=tmpBestFitness;
 			theMVP=population[tmpBestIndex];
 		}
-		/*
-		std::cout << "\t chromosome "<< population[tmpBestIndex].size() <<":" <<std::endl;
 
-									unsigned cnt=0;
-									for(auto a :population[tmpBestIndex]){
-										if(cnt++%3 ==0)std::cout <<PARAM_IN+(cnt/3) <<": ";
-										std::cout << a << " ";
-										if(cnt%3 ==0)std::cout <<", ";
-									}
-									std::cout <<std::endl;
-
-		std::cout << "\tStart evolution."<< std::endl;*/
 		//evolution
 		for(unsigned actGen=0; actGen<generations; ++actGen){
 			//mutate the best
-			//std::cout << "\t\tmutate."<< std::endl;
 			for (unsigned i=0; i < populationSize;  i++) {
 				population[i]=theMVP;
 				mutate(population[i]);
 			}
 
 			//evaluate population
-			//std::cout << "\t\tevaluate."<< std::endl;
 
 			evaluate(population, tmpBestFitness, tmpBestIndex, train, trainOut);
 			if(tmpBestFitness<=bestFitness){
@@ -497,16 +410,6 @@ Chromosome CGP::evolve(const unsigned runs,
 		}
 
 		std::cout << "\tBest fitness so far in all runs: " << bestFitness << std::endl;
-/*
-		std::cout << "\t chromosome "<< theMVP.size() <<":" <<std::endl;
-
-					cnt=0;
-					for(auto a :theMVP){
-						if(cnt++%3 ==0)std::cout <<PARAM_IN+(cnt/3) <<": ";
-						std::cout << a << " ";
-						if(cnt%3 ==0)std::cout <<", ";
-					}
-					std::cout <<std::endl;*/
 	}
 
 	//the end

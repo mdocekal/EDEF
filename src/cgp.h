@@ -122,7 +122,19 @@ public:
 	 */
 	void useFilter(Chromosome c, const Image& img, std::vector<uint8_t>& resImage, const std::set<unsigned>& usedB);
 
-
+	/**
+	 * Calculates fitness for given chromosome.
+	 *
+	 * @param[in] c
+	 * 	Chromosome for fitness checking.
+	 * @param[in] train
+	 * 	Train images that will be used as input for filter.
+	 * @param[in] trainOut
+	 * 	Train images that will be used for filter evaluation. (Desired result)
+	 * @return Chromosome fitness on training data.
+	 */
+	uint64_t fitness(const Chromosome& c, const std::vector<Image>& train,
+			const std::vector<Image>& trainOut);
 	/**
 	 * Get used blocks in chromosome.
 	 *
@@ -249,18 +261,6 @@ private:
 	void evaluate(const Population& population, uint64_t& bestFitness, unsigned& bestIndex,
 			const std::vector<Image>& train, const std::vector<Image>& trainOut);
 
-	/**
-	 * Calculates fitness for given chromosome.
-	 *
-	 * @param[in] c
-	 * 	Chromosome for fitness checking.
-	 * @param[in] train
-	 * 	Train images that will be used as input for filter.
-	 * @param[in] trainOut
-	 * 	Train images that will be used for filter evaluation. (Desired result)
-	 * @return Chromosome fitness on training data.
-	 */
-	uint64_t fitness(const Chromosome& c, const std::vector<Image>& train, const std::vector<Image>& trainOut);
 
 	/**
 	 * Apply filter.

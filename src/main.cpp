@@ -334,18 +334,6 @@ int main(int argc, char* argv[]){
 		Args myArgs(argc, argv);
 		Config& config=myArgs.getConfig();
 		//read config
-
-/*
-		Image img("data/test.jpg");
-
-		std::cout << img.getWidth() << ", " << img.getHeight() << ", "  << img.getBytesPerPixel() <<std::endl;
-		for(unsigned y=0; y<img.getHeight(); ++y){
-			for(unsigned x=0; x<img.getWidth(); ++x){
-				std::cout << static_cast<unsigned>(img.getPixels()[y*img.getWidth()+x]) << " ";
-			}
-			std::cout << std::endl;
-		}*/
-
 		switch (myArgs.getAction()) {
 		case Args::Action::HELP:
 			//User needs our help!
