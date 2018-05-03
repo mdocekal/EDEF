@@ -15,13 +15,15 @@
 #include <set>
 #include <random>
 #include <iostream>
+#include <cstdint>
 #include "Image.h"
+
 
 
 /**
  * Representation of chromosome.
  */
-typedef std::vector<u_int32_t> Chromosome;
+typedef std::vector<uint32_t> Chromosome;
 
 /**
  * Representation of whole population.
@@ -219,7 +221,7 @@ private:
 
 	std::vector<std::vector<int>> colVal; //! Pre calculated posible values of inputs for columns
 
-	std::vector<u_int8_t> outputs; //! tmp cache for block outputs when filter is applied.
+	std::vector<uint8_t> outputs; //! tmp cache for block outputs when filter is applied.
 
 	std::set<unsigned> damaged; //! Contains indexes of damaged blocks. (first block index is PARAM_IN)
 
@@ -244,7 +246,7 @@ private:
 	 * @param[in] trainOut
 	 * 	Train images that will be used for filter evaluation. (Desired result)
 	 */
-	void evaluate(const Population& population, u_int64_t& bestFitness, unsigned& bestIndex,
+	void evaluate(const Population& population, uint64_t& bestFitness, unsigned& bestIndex,
 			const std::vector<Image>& train, const std::vector<Image>& trainOut);
 
 	/**
@@ -258,7 +260,7 @@ private:
 	 * 	Train images that will be used for filter evaluation. (Desired result)
 	 * @return Chromosome fitness on training data.
 	 */
-	u_int64_t fitness(const Chromosome& c, const std::vector<Image>& train, const std::vector<Image>& trainOut);
+	uint64_t fitness(const Chromosome& c, const std::vector<Image>& train, const std::vector<Image>& trainOut);
 
 	/**
 	 * Apply filter.

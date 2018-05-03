@@ -1,472 +1,521 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
-#include <string>
-#include <string.h>
-#include <unistd.h>
-#include "cgp.h"
+/**
+ * Project: EDEF
+ * @file CGP.cpp
+ * @date 30. 4. 2018
+ * @author (just minor adjustments) xdocek09
+ * @brief Source file for CGP (cartesian genetic programming) class.
+ * Inspired from implementation provided in lecture BIN at FIT BUT.
+ * https://www.fit.vutbr.cz/study/courses/BIN
+ */
 
-typedef int *chromozom;                //dynamicke pole int, velikost dana m*n*(vstupu bloku+vystupu bloku) + vystupu komb
-chromozom *populace[POPULACE_MAX];   //pole ukazatelu na chromozomy jedincu populace
-int fitt[POPULACE_MAX];              //fitness jedincu populace
-int uzitobloku(int *p_chrom);
+#include "CGP.h"
+#include <queue>
+#include <random>
 
-int bestfit, bestfit_idx;   //nejlepsi fittnes, index jedince v populaci
-int bestblk;
 
-int *vystupy;               //pole vystupnich hodnot pro vyhodnocovani fce
-int *pouzite;               //pole, kde kazda polozka odpovida bloku a urcuje zda se jedna o pouzity blok
 
-int param_m = PARAM_M;            //pocet sloupcu
-int param_n = PARAM_N;            //pocet radku
-int param_in = PARAM_IN;          //pocet vstupu komb. obvodu
-int param_out = PARAM_OUT;        //pocet vystupu komb. obvodu
-int param_populace = POPULACE_MAX;//pocet jedincu populace
-int block_in = 2;             //pocet vstupu  jednoho bloku (neni impl pro zmenu)
-int l_back = L_BACK;              // 1 (pouze predchozi sloupec)  .. param_m (maximalni mozny rozsah);
 
-int param_fitev;  //pocet pruchodu pro ohodnoceni jednoho chromozomu, vznikne jako (pocet vstupnich dat/(pocet vstupu+pocet vystupu))
-
-int param_generaci; //pocet kroku evoluce
-int data[DATASIZE]; //trenovaci data - vstupni hodnoty + k nim prislusejici spravne vystupni hodnoty
-int sizesloupec = param_n*(block_in+1); //pocet polozek ktery zabira sloupec v chromozomu
-int outputidx   = param_m*sizesloupec; //index v poli chromozomu, kde zacinaji vystupy
-int maxidx_out  = param_n*param_m + param_in; //max. index pouzitelny jako vstup  pro vystupy
-int maxfitness  = 0; //max. hodnota fitness
-
-int fitpop, maxfitpop; //fitness populace
-
-typedef struct { //struktura obsahujici mozne hodnoty vstupnich poli chromozomu pro urcity sloupec
-    int pocet;   //pouziva se pri generovani noveho cisla pri mutaci
-    int *hodnoty;
-} sl_rndval;
-
-sl_rndval **sloupce_val;  //predpocitane mozne hodnoty vstupu pro jednotlive sloupce
-#define ARRSIZE PARAM_M*PARAM_N    //velikost pole = pocet bloku
-
-#define LOOKUPTABSIZE 256
-unsigned char lookupbit_tab[LOOKUPTABSIZE]; //LookUp pro rychle zjisteni poctu nastavenych bitu na 0 v 8bit cisle
-
-#define copy_chromozome(from,to) (chromozom *) memcpy(to, from, (outputidx + param_out)*sizeof(int));
-
-#define FITNESS_CALLCNT (POPULACE_MAX + PARAM_GENERATIONS*POPULACE_MAX) //pocet volani funkce fitness
-
-//-----------------------------------------------------------------------
-//Vypis chromozomu
-//=======================================================================
-//p_chrom ukazatel na chromozom
-//-----------------------------------------------------------------------
-void print_chrom(FILE *fout, chromozom p_chrom) {
-  fprintf(fout, "{%d,%d, %d,%d, %d,%d,%d}", param_in, param_out, param_m, param_n, block_in, l_back, uzitobloku(p_chrom));
-  for(int i=0; i<outputidx; i++) {
-     if (i % 3 == 0) fprintf(fout,"([%d]",(i/3)+param_in);
-     fprintf(fout,"%d", *p_chrom++);
-     ((i+1) % 3 == 0) ? fprintf(fout,")") : fprintf(fout,",");
-   }
-  fprintf(fout,"(");
-  for(int i=outputidx; i<outputidx+param_out; i++) {
-     if (i > outputidx) fprintf(fout,",");
-     fprintf(fout,"%d", *p_chrom++);
-  }
-  fprintf(fout,")");
-  fprintf(fout,"\n");
+CGP::CGP(const unsigned c, const unsigned r): cols(c), rows(r){
+	randGen.seed(std::random_device()());
+	calcColVals();
+	outputs.resize(cols*rows);
 }
 
-void print_xls(FILE *xlsfil) {
-  fprintf(xlsfil, "%d\t%d\t%d\t%d\t\t",param_generaci,bestfit,fitpop,bestblk);
-  for (int i=0; i < param_populace;  i++)
-      fprintf(xlsfil, "%d\t",fitt[i]);
-  fprintf(xlsfil, "\n");
+CGP::CGP(const unsigned c, const unsigned r, const unsigned lBack): cols(c), rows(r), lBack(lBack),
+		distFunctions(0,static_cast<unsigned>(Function::DAMAGED)-1){//DAMAGED is last and we do not want to generate it.
+	randGen.seed(std::random_device()());
+	calcColVals();
+	outputs.resize(cols*rows);
 }
 
-//-----------------------------------------------------------------------
-//POCET POUZITYCH BLOKU
-//=======================================================================
-//p_chrom ukazatel na chromozom,jenz se ma ohodnotit
-//-----------------------------------------------------------------------
-int uzitobloku(chromozom p_chrom) {
-    int i,j, in,idx, poc = 0;
-    int *p_pom;
-    memset(pouzite, 0, maxidx_out*sizeof(int));
+inline void CGP::calcColVals(){
+	colVal.clear();
+	colVal.resize(cols);
 
-    //oznacit jako pouzite bloky napojene na vystupy
-    p_pom = p_chrom + outputidx;
-    for (i=0; i < param_out; i++) {
-        in = *p_pom++;
-        pouzite[in] = 1;
-    }
+	for (unsigned i = 0; i < cols; i++) {
+		//std::cout << "GENERATE COL " << i << std::endl;
+		int minidx = rows * (i - lBack) + PARAM_IN;	//index of first reachable block output
+		if (minidx < static_cast<long>(PARAM_IN))
+			minidx = PARAM_IN; //block outputs are from PARAM_IN to PARAM_IN+cols*rows
+		unsigned maxidx = i * rows + PARAM_IN; //index of first not reachable block output
 
-    //pruchod od vystupu ke vstupum
-    p_pom = p_chrom + outputidx - 1;
-    idx = maxidx_out-1;
-    for (i=param_m; i > 0; i--) {
-        for (j=param_n; j > 0; j--,idx--) {
-            p_pom--; //fce
-            if (pouzite[idx] == 1) { //pokud je blok pouzit, oznacit jako pouzite i bloky, na ktere je napojen
-               in = *p_pom--; //in2
-               pouzite[in] = 1;
-               in = *p_pom--; //in1
-               pouzite[in] = 1;
-               poc++;
-            } else {
-               p_pom -= block_in; //posun na predchozi blok
-            }
-        }
-    }
+		colVal[i].resize(PARAM_IN + maxidx - minidx);
 
-    return poc;
+		unsigned j = 0;
+		for (unsigned k = 0; k < PARAM_IN; k++, j++) //inserting indexes of inputs
+			colVal[i][j] = k;
+
+		for (unsigned k = minidx; k < maxidx; k++, j++) //inserting indexes of posible block outputs
+			colVal[i][j] = k;
+
+	}
 }
 
-//-----------------------------------------------------------------------
-//Fitness
-//=======================================================================
-//p_chrom ukazatel na chromozom,jenz se ma ohodnotit
-//p_svystup ukazatel na pozadovane hodnoty vystupu
-//p_vystup ukazatel na pole vstupnich a vystupnich hodnot bloku
-//-----------------------------------------------------------------------
-inline int fitness(chromozom p_chrom, int *p_svystup) {
-    int in1,in2,fce;
-    int i,j;
-    int *p_vystup = vystupy;
-    p_vystup += param_in; //posunuti az za hodnoty vstupu
+inline uint8_t CGP::apply(const Chromosome&c, const std::set<unsigned>& usedBlocks, const std::vector<uint8_t>& inputs){
 
-    //Simulace obvodu pro dany stav vstupu
-    //----------------------------------------------------------------------------
-    for (i=0; i < param_m; i++) {  //vyhodnoceni funkce pro sloupec
-        for (j=0; j < param_n; j++) { //vyhodnoceni funkce pro radky sloupce
-            in1 = vystupy[*p_chrom++];
-            in2 = vystupy[*p_chrom++];
-            fce = *p_chrom++;
-            switch (fce) {
-              case 0: *p_vystup++ = in1; break;       //in1
 
-              case 1: *p_vystup++ = in1 & in2; break; //and
-              case 2: *p_vystup++ = in1 | in2; break; //or
-              case 3: *p_vystup++ = in1 ^ in2; break; //xor
+	for(auto blockIdx : usedBlocks){
 
-              case 4: *p_vystup++ = ~in1; break;  //not in1
-              case 5: *p_vystup++ = ~in2; break;  //not in2
+		//its a set so indexes are sorted so it should be ok
+		//and we will have calculated all outputs in needed order
 
-              case 6: *p_vystup++ = in1 & ~in2; break;
-              case 7: *p_vystup++ = ~(in1 & in2); break;
-              case 8: *p_vystup++ = ~(in1 | in2); break;
-              default: ;
-                 *p_vystup++ = 0xffffffff; //log 1
-            }
-        }
-    }
 
-    register int vysl;
-    register int pocok = 0; //pocet shodnych bitu
+		unsigned out=blockIdx-PARAM_IN;	//block output
 
-    //Vyhodnoceni odezvy
-    //----------------------------------------------------------------------------
-    //pomoci 4 nahledu do lookup tabulky
-    for (i=0; i < param_out; i++) {  
-        vysl = (vystupy[*p_chrom++] ^ *p_svystup++);
-        pocok += lookupbit_tab[vysl & 0xff]; //pocet 0 => pocet spravnych
-        vysl = vysl >> 8;
-        pocok += lookupbit_tab[vysl & 0xff];
-        vysl = vysl >> 8;
-        pocok += lookupbit_tab[vysl & 0xff];
-        vysl = vysl >> 8;
-        pocok += lookupbit_tab[vysl & 0xff];
-    }
+		//get inputs
+		unsigned in1=c[(blockIdx-PARAM_IN)*CHROMOSOME_BLOCK_SIZE];
+		unsigned in2=c[(blockIdx-PARAM_IN)*CHROMOSOME_BLOCK_SIZE+1];
+		Function f=static_cast<Function>(c[(blockIdx-PARAM_IN)*CHROMOSOME_BLOCK_SIZE+2]);
+		//std::cout << "Block " << blockIdx << " function " << static_cast<unsigned>(f) << std::endl;
+		//std::cout << "\t " << " in1: " << in1 << " in2: " << in2 << std::endl;
 
-    /*
-    //pomoci for cyklu
-    vysl = ~(vystupy[*p_chrom++] ^ *p_svystup++); //bit 1 udava spravnou hodnotu
-    for (j=0; j < 32; j++) {
-        pocok += (vysl & 1);
-        vysl = vysl >> 1;
-    }
-    */
-    return pocok;
+
+		unsigned x,y;
+
+		if(in1<PARAM_IN){
+			//connected to input
+			x=inputs[in1];
+		}else{
+			x=outputs[in1-PARAM_IN];
+		}
+
+		if(in2<PARAM_IN){
+			//connected to input
+			y=inputs[in2];
+		}else{
+			y=outputs[in2-PARAM_IN];
+		}
+
+		//std::cout << "\t " << " x: " << x << " y: " << y << std::endl;
+		//evaluate block
+		switch (f) {
+			case Function::MAX_VAL:
+				outputs[out]=std::numeric_limits<u_int8_t>::max();
+				break;
+			case Function::IDENTITY:
+				outputs[out]=x;
+				break;
+			case Function::INVERSION:
+				outputs[out]=std::numeric_limits<u_int8_t>::max()-x;
+				break;
+			case Function::BIT_OR:
+				outputs[out]=x|y;
+				break;
+			case Function::BIT_OR_WITH_INVERSE:
+				outputs[out]=(std::numeric_limits<u_int8_t>::max()-x) |y;
+				break;
+			case Function::BIT_AND:
+				outputs[out]=x&y;
+				break;
+			case Function::INVERSION_OF_BIT_AND:
+				outputs[out]=std::numeric_limits<u_int8_t>::max()-(x&y);
+				break;
+			case Function::XOR:
+				outputs[out]=x^y;
+				break;
+			case Function::DIVIDING_BY_TWO:
+				outputs[out]=x>>1;
+				break;
+			case Function::DIVIDING_BY_FOUR:
+				outputs[out]=x>>2;
+				break;
+			case Function::MULTIPLE_DIVIDE_AND_OR:
+				outputs[out]=(x << 4) | (y >> 4);
+				break;
+			case Function::SUM:
+				outputs[out]=x+y;
+				break;
+			case Function::SUM_WITH_SATURATION:
+				{
+					unsigned s=x+y;
+					if(std::numeric_limits<u_int8_t>::max()>s){
+						outputs[out]=s;
+					}else{
+						outputs[out]=std::numeric_limits<u_int8_t>::max();
+					}
+				}
+				break;
+			case Function::INT_AVG:
+				outputs[out]=(x+y)>>1;
+				break;
+			case Function::MAX:
+				outputs[out]=(x>y)?x:y;
+				break;
+			case Function::MIN:
+				outputs[out]=(x<y)?x:y;
+				break;
+			default:
+				//DAMAGED
+				outputs[out]=0;
+		}
+
+		//std::cout << "\t " << " res: " << static_cast<unsigned>(outputs[out]) << std::endl;
+	}
+
+	if(c[c.size()-1]<PARAM_IN){
+		//std::cout << "\t " << "out connected to:"<< c[c.size()-1] << " Tot res: " << static_cast<unsigned>(inputs[c[c.size()-1]]) << std::endl;
+		//get it straight from inputs
+		return inputs[c[c.size()-1]];
+	}else{
+		//std::cout << "\t " << "out connected to:"<< c[c.size()-1] << " Tot res: " << static_cast<unsigned>(outputs[c[c.size()-1]-PARAM_IN]) << std::endl;
+		//get result from calculated output of a block
+		return outputs[c[c.size()-1]-PARAM_IN];
+	}
+
 }
 
-//-----------------------------------------------------------------------
-//OHODNOCENI POPULACE
-//=======================================================================
-inline void ohodnoceni(int *vstup_komb, int minidx, int maxidx, int ignoreidx) {
-    int fit;
-    for (int l=0; l < param_fitev; l++) {
-        //nakopirovani vstupnich dat na vstupy komb. site
-        memcpy(vystupy, vstup_komb, param_in*sizeof(int));
-        vstup_komb += param_in;
-
-        //simulace obvodu vsech jedincu populace pro dane vstupy
-        for (int i=minidx; i < maxidx; i++) {
-            if (i == ignoreidx) continue;
-            
-            fit = fitness((int *) populace[i], vstup_komb);
-            (l==0) ? fitt[i] = fit : fitt[i] += fit;
-        }
-
-        vstup_komb += param_out; //posun na dalsi vstupni kombinace
-    }
+void CGP::damageBlock(Chromosome&c, unsigned idx){
+	c[(idx-PARAM_IN)*CHROMOSOME_BLOCK_SIZE+2]=static_cast<u_int32_t>(Function::DAMAGED);
 }
 
-//-----------------------------------------------------------------------
-//MUTACE
-//=======================================================================
-//p_chrom ukazatel na chromozom, jenz se ma zmutovat
-//-----------------------------------------------------------------------
-inline void mutace(chromozom p_chrom) {
-    int rnd;
-    int genu = (rand()%MUTACE_MAX) + 1;     //pocet genu, ktere se budou mutovat
-    for (int j = 0; j < genu; j++) {
-        int i = rand() % (outputidx + param_out); //vyber indexu v chromozomu pro mutaci
-        int sloupec = (int) (i / sizesloupec);
-        rnd = rand();
-        if (i < outputidx) { //mutace bloku
-           if ((i % 3) < 2) { //mutace vstupu
-              p_chrom[i] = sloupce_val[sloupec]->hodnoty[(rnd % (sloupce_val[sloupec]->pocet))];
-           } else { //mutace fce
-              p_chrom[i] = rnd % FUNCTIONS;
-           }
-        } else { //mutace vystupu
-           p_chrom[i] = rnd % maxidx_out;
-        }
-    }
+std::set<unsigned> CGP::usedBlocks(const Chromosome&c){
+	std::set<unsigned> used;
+	std::queue<unsigned> process;
+
+	//start from output
+	process.push(c[c.size()-1]);
+
+	//std::cout << "used blocks:" <<std::endl;
+	//std::cout << "\t chromosome "<< c.size() <<":" <<std::endl;
+	/*
+	unsigned cnt=0;
+	for(auto a :c){
+		if(cnt++%3 ==0)std::cout <<PARAM_IN+(cnt/3) <<": ";
+		std::cout << a << " ";
+		if(cnt%3 ==0)std::cout <<", ";
+	}*/
+	//std::cout << std::endl;
+	while(!process.empty()){
+		//std::cout << "\t proc: " << process.front() <<std::endl;
+		if(process.front()>=PARAM_IN){
+			//std::cout << "\t is block: " << process.front() <<std::endl;
+			//its block, not just input
+			used.insert(process.front());
+			process.push(c[(process.front()-PARAM_IN)*CHROMOSOME_BLOCK_SIZE]);		//first input
+			process.push(c[(process.front()-PARAM_IN)*CHROMOSOME_BLOCK_SIZE+1]);	//second input
+		}
+		process.pop();
+	}
+
+	return used;
 }
 
-//-----------------------------------------------------------------------
-// MAIN
-//-----------------------------------------------------------------------
-int main(int argc, char* argv[])
-{
-    using namespace std;
-
-    FILE *xlsfil;
-    string logfname, logfname2;
-    int rnd, fitn, blk;
-    int *vstup_komb; //ukazatel na vstupni data
-    bool log;
-    int run_succ = 0;
-    int i;
-    int parentidx;
-    
-    logfname = "log";
-    if ((argc == 2) && (argv[1] != "")) 
-       logfname = string(argv[1]);
-    
-    vystupy = new int [maxidx_out+param_out];
-    pouzite = new int [maxidx_out];
-
-    init_data(data); //inicializace dat
-
-    srand((unsigned) time(NULL)); //inicializace pseudonahodneho generatoru
-
-    param_fitev = DATASIZE / (param_in+param_out); //Spocitani poctu pruchodu pro ohodnoceni
-    maxfitness = param_fitev*param_out*32;         //Vypocet max. fitness
-    
-    for (int i=0; i < param_populace; i++) //alokace pameti pro chromozomy populace
-        populace[i] = new chromozom [outputidx + param_out];
-    
-    //---------------------------------------------------------------------------
-    // Vytvoreni LOOKUP tabulky pro rychle zjisteni poctu nenulovych bitu v bytu
-    //---------------------------------------------------------------------------
-    for (int i = 0; i < LOOKUPTABSIZE; i++) {
-        int poc1 = 0;
-        int zi = ~i;
-        for (int j=0; j < 8; j++) {
-            poc1 += (zi & 1);
-            zi = zi >> 1;
-        }
-        lookupbit_tab[i] = poc1;
-    }
-
-    //-----------------------------------------------------------------------
-    //Priprava pole moznych hodnot vstupu pro sloupec podle l-back a ostatnich parametru
-    //-----------------------------------------------------------------------
-    sloupce_val = new sl_rndval *[param_m];
-    for (int i=0; i < param_m; i++) {
-        sloupce_val[i] = new sl_rndval;
-
-        int minidx = param_n*(i-l_back) + param_in;
-        if (minidx < param_in) minidx = param_in; //vystupy bloku zacinaji od param_in do param_in+m*n
-        int maxidx = i*param_n + param_in;
-
-        sloupce_val[i]->pocet = param_in + maxidx - minidx;
-        sloupce_val[i]->hodnoty = new int [sloupce_val[i]->pocet];
-
-        int j=0;
-        for (int k=0; k < param_in; k++,j++) //vlozeni indexu vstupu komb. obvodu
-            sloupce_val[i]->hodnoty[j] = k;
-        for (int k=minidx; k < maxidx; k++,j++) //vlozeni indexu moznych vstupu ze sousednich bloku vlevo
-            sloupce_val[i]->hodnoty[j] = k;
-    }
-
-    //-----------------------------------------------------------------------
-    printf("LogName: %s  l-back: %d  popsize:%d\n", logfname.c_str(), l_back, param_populace);
-    //-----------------------------------------------------------------------
-
-    for (int run=0; run < PARAM_RUNS; run++) {
-        time_t t;
-        struct tm *tl;
-        char fn[100];
-    
-        t = time(NULL);
-        tl = localtime(&t);
-    
-        sprintf(fn, "_%d", run);
-        logfname2 = logfname + string(fn);
-        strcpy(fn, logfname2.c_str()); strcat(fn,".xls");
-        xlsfil = fopen(fn,"wb");
-        if (!xlsfil) {
-           printf("Can't create file %s!\n",fn);
-           return -1;
-        }
-        //Hlavicka do log. souboru
-        fprintf(xlsfil, "Generation\tBestfitness\tPop. fitness\t#Blocks\t\t");
-        for (int i=0; i < param_populace;  i++) fprintf(xlsfil,"chrom #%d\t",i);
-        fprintf(xlsfil, "\n");
-    
-        printf("----------------------------------------------------------------\n");
-        printf("Run: %d \t\t %s", run, asctime(tl));
-        printf("----------------------------------------------------------------\n");
-    
-        //-----------------------------------------------------------------------
-        //Vytvoreni pocatecni populace
-        //-----------------------------------------------------------------------
-        chromozom p_chrom;
-        int sloupec;
-        for (int i=0; i < param_populace; i++) {
-            p_chrom = (chromozom) populace[i];
-            for (int j=0; j < param_m*param_n; j++) {
-                sloupec = (int)(j / param_n);
-                // vstup 1
-                *p_chrom++ = sloupce_val[sloupec]->hodnoty[(rand() % (sloupce_val[sloupec]->pocet))];
-                // vstup 2
-                *p_chrom++ = sloupce_val[sloupec]->hodnoty[(rand() % (sloupce_val[sloupec]->pocet))];
-                // funkce
-                rnd = rand() % FUNCTIONS;
-                *p_chrom++ = rnd;
-            }
-            for (int j=outputidx; j < outputidx+param_out; j++)  //napojeni vystupu
-                *p_chrom++ = rand() % maxidx_out;
-        }
-
-        //-----------------------------------------------------------------------
-        //Ohodnoceni pocatecni populace
-        //-----------------------------------------------------------------------
-        bestfit = 0; bestfit_idx = -1;
-        ohodnoceni(data /*vektor ocekavanych dat*/, 0, param_populace, -1);
-        for (int i=0; i < param_populace; i++) { //nalezeni nejlepsiho jedince
-            if (fitt[i] > bestfit) {
-               bestfit = fitt[i];
-               bestfit_idx = i;
-            }
-        }
-    
-        //bestfit_idx ukazuje na nejlepsi reseni v ramci pole jedincu "populace"
-        //bestfit obsahuje fitness hodnotu prvku s indexem bestfit_idx
-
-        if (bestfit_idx == -1) 
-           return 0;
-    
-        //-----------------------------------------------------------------------
-        // EVOLUCE
-        //-----------------------------------------------------------------------
-        param_generaci = 0;
-        maxfitpop = 0;
-        while (param_generaci++ < PARAM_GENERATIONS) {
-            //-----------------------------------------------------------------------
-            //Periodicky vypis chromozomu populace
-            //-----------------------------------------------------------------------
-            #ifdef PERIODIC_LOG
-            if (param_generaci % PERIODICLOGG == 0) {
-               printf("Generation: %d\n",param_generaci);
-               for(int j=0; j<param_populace; j++) {
-                  printf("{%d, %d}",fitt[j],uzitobloku((int *)populace[j]));
-                  print_chrom(stdout,(chromozom)populace[j]);
-               }
-            }
-            #endif
-
-            //-----------------------------------------------------------------------
-            //mutace nejlepsiho jedince populace (na param_populace mutantu)
-            //-----------------------------------------------------------------------
-            for (int i=0, midx = 0; i < param_populace;  i++, midx++) {
-                if (bestfit_idx == i) continue;
-
-                p_chrom = (int *) copy_chromozome(populace[bestfit_idx],populace[midx]);
-                mutace(p_chrom);
-            }
-
-            //-----------------------------------------------------------------------
-            //ohodnoceni populace
-            //-----------------------------------------------------------------------
-            ohodnoceni(data, 0, param_populace, bestfit_idx);
-            parentidx = bestfit_idx;
-            fitpop = 0;
-            log = false;
-            for (int i=0; i < param_populace; i++) { 
-                fitpop += fitt[i];
-                
-                if (i == parentidx) continue; //preskocime rodice
-
-                if (fitt[i] == maxfitness) {
-                   //optimalizace na poc. bloku obvodu
-
-                   blk = uzitobloku((chromozom) populace[i]);
-                   if (blk <= bestblk) {
-
-                      if (blk < bestblk) {
-                         printf("Generation:%d\t\tbestblk b:%d\n",param_generaci,blk);
-                         log = true;
-                      }
-
-                      bestfit_idx = i;
-                      bestfit = fitt[i];
-                      bestblk = blk;
-                   }
-                } else if (fitt[i] >= bestfit) {
-                   //nalezen lepsi nebo stejne dobry jedinec jako byl jeho rodic
-
-                   if (fitt[i] > bestfit) {
-                      printf("Generation:%d\t\tFittness: %d/%d\n",param_generaci,fitt[i],maxfitness);
-                      log = true;
-                   }
-
-                   bestfit_idx = i;
-                   bestfit = fitt[i];
-                   bestblk = ARRSIZE;
-                }
-            }
-    
-            //-----------------------------------------------------------------------
-            // Vypis fitness populace do xls souboru pri zmene fitness populace/poctu bloku
-            //-----------------------------------------------------------------------
-            if ((fitpop > maxfitpop) || (log)) {
-               print_xls(xlsfil);
-
-               maxfitpop = fitpop;
-               log = false;
-            }
-        }
-        //-----------------------------------------------------------------------
-        // Konec evoluce
-        //-----------------------------------------------------------------------
-        print_xls(xlsfil);
-        fclose(xlsfil);
-        printf("Best chromosome fitness: %d/%d\n",bestfit,maxfitness);
-        printf("Best chromosome: ");
-        print_chrom(stdout, (chromozom)populace[bestfit_idx]);
-    
-        if (bestfit == maxfitness) {
-            strcpy(fn, logfname2.c_str()); strcat(fn,".chr");
-            FILE *chrfil = fopen(fn,"wb");
-            fprintf(chrfil, POPIS);
-            print_chrom(chrfil, (chromozom)populace[bestfit_idx]);
-            fclose(chrfil);
-        }
-
-        if (bestfit == maxfitness) 
-           run_succ++; 
-    } //runs
-    for (int i=param_populace-1; i >= 0; i--)
-        delete[] populace[i];
-    printf("Successful runs: %d/%d (%5.1f%%)",run_succ, PARAM_RUNS, 100*run_succ/(float)PARAM_RUNS);
-    return 0;
+Image CGP::useFilter(Chromosome c, const Image& img){
+	static std::vector<uint8_t> resImage;	//the cache
+	std::set<unsigned> usedB=usedBlocks(c);
+	useFilter(c, img, resImage, usedB);
+	return Image(img.getWidth(), img.getHeight(), resImage);
 }
+
+inline void CGP::useFilter(Chromosome c, const Image& img, std::vector<uint8_t>& resImage, const std::set<unsigned>& usedB){
+	std::vector<uint8_t> inputs(PARAM_IN);
+
+	const std::vector<uint8_t>& px = img.getPixels();
+	resImage.resize(img.getHeight() * img.getWidth());
+
+	//do the edges
+	for (unsigned y = 0; y < img.getHeight(); ++y) {
+		for (unsigned x = 0; x < img.getWidth(); ++x) {
+
+			unsigned cnt = 0;
+			for (long tmpY = -1; tmpY <= 1; tmpY++) {	// -1 0 1 y offsets
+				long useY = tmpY + y;
+
+				//fix offset according to actual position
+				if (useY < 0)
+					useY = 0;
+				if (useY >= img.getHeight())
+					useY = img.getHeight() - 1;
+
+				for (long tmpX = -1; tmpX <= 1; tmpX++) {	// -1 0 1 x offsets
+					long useX = tmpX+x;
+					//fix offset according to actual position
+					if (useX < 0)
+						useX = 0;
+					if (useX >= img.getWidth())
+						useX = img.getWidth() - 1;
+					inputs[cnt++] = px[useY * img.getWidth() + useX];
+				}
+			}
+
+			//todo:delete
+/*
+				std::cout << "Inputs y/x " << y << "/" << x << std::endl;
+				for(unsigned y=0; y<3; y++){
+					std::cout << "\t" << std::endl;
+					for(unsigned x=0; x<3; x++){
+						std::cout << static_cast<unsigned> (inputs[y*3+x]) << " ";
+					}
+					std::cout << std::endl;
+				}*/
+				//todo:\delete
+
+			//apply filter on given inputs
+			resImage[y * img.getWidth() + x] = apply(c, usedB, inputs);
+
+			if (y != 0 && y != img.getHeight() - 1 && x!=img.getWidth()-1){
+				if(img.getWidth()>1){
+					x = img.getWidth() - 2; //jump
+				}
+			}
+
+		}
+	}
+	//std::cout << "\trest"<<std::endl;
+	//the rest
+	for (unsigned y = 1; y < img.getHeight() - 1; ++y) {
+		for (unsigned x = 1; x < img.getWidth() - 1; ++x) {
+			//get inputs
+			//std::cout << y << "/" << img.getHeight() << " " << x <<"/" <<img.getWidth() <<std::endl;
+			inputs[0] = px[x + (y - 1) * img.getWidth() - 1];
+			inputs[1] = px[x + (y - 1) * img.getWidth()];
+			inputs[2] = px[x + (y - 1) * img.getWidth() + 1];
+			inputs[3] = px[x + y*img.getWidth() - 1];
+			inputs[4] = px[x + y*img.getWidth()];
+			inputs[5] = px[x + y*img.getWidth() + 1];
+			inputs[6] = px[x + (y + 1) * img.getWidth() - 1];
+			inputs[7] = px[x + (y + 1) * img.getWidth()];
+			inputs[8] = px[x + (y + 1) * img.getWidth() + 1];
+
+			//todo:delete
+/*
+							std::cout << "Inputs y/x " << y << "/" << x << std::endl;
+							for(unsigned y=0; y<3; y++){
+								std::cout << "\t" << std::endl;
+								for(unsigned x=0; x<3; x++){
+									std::cout << static_cast<unsigned> (inputs[y*3+x]) << " ";
+								}
+								std::cout << std::endl;
+							}*/
+							//todo:\delete
+
+			//apply filter on given inputs
+			resImage[y * img.getWidth() + x] = apply(c, usedB, inputs);
+
+		}
+	}
+
+	//todo:delete
+/*
+	std::cout << "COMPLETE RESULT" << std::endl;
+	for(unsigned y=0; y<img.getHeight(); ++y){
+				for(unsigned x=0; x<img.getWidth(); ++x){
+					std::cout << static_cast<unsigned>(resImage[y*img.getWidth()+x]) << " ";
+				}
+				std::cout << std::endl;
+			}*/
+	//todo:\delete
+
+
+}
+
+inline u_int64_t CGP::fitness(const Chromosome& c, const std::vector<Image>& train, const std::vector<Image>& trainOut){
+	u_int64_t fitness=0;
+	//std::cout << "\tfitness"<<std::endl;
+	//apply filter on Image
+	//filter interpretation
+	std::set<unsigned> usedB=usedBlocks(c);
+	static std::vector<uint8_t> resImage;	//the cache
+	std::vector<uint8_t> inputs(PARAM_IN);
+
+
+	unsigned selectedImage=0;
+	for(const Image& img: train){
+		if (img.getHeight() == 0 || img.getWidth() == 0) continue;
+		useFilter(c, img, resImage, usedB);
+		//std::cout << "\tevaluate results"<<std::endl;
+		auto pxRight=trainOut[selectedImage].getPixels();
+		//evaluate the result
+		for(unsigned y=0; y<img.getHeight(); ++y){
+			for(unsigned x=0; x<img.getWidth(); ++x){
+				unsigned diff=abs(pxRight[y*img.getWidth()+x]-resImage[y*img.getWidth()+x]);
+				if(diff>std::numeric_limits<u_int64_t>::max()-fitness){
+					//overflow
+					return std::numeric_limits<u_int64_t>::max();
+				}
+				fitness+=diff;
+			}
+		}
+
+		++selectedImage;
+	}
+
+	//todo:delete
+	//std::cout << "Fitness: " << fitness << std::endl;
+
+	return fitness;
+}
+
+inline void CGP::evaluate(const Population& population, u_int64_t& bestFitness, unsigned& bestIndex,
+		const std::vector<Image>& train, const std::vector<Image>& trainOut){
+	bestFitness=std::numeric_limits<u_int64_t>::max();
+	bestIndex=0;
+
+	//evaluate and find the best one
+	for(unsigned i=0; i< population.size(); ++i){
+		unsigned actF=fitness(population[i], train, trainOut);
+		if(actF<bestFitness){	//lower is better
+			bestFitness=actF;
+			bestIndex=i;
+		}
+	}
+}
+
+inline void CGP::mutate(Chromosome& c){
+	std::uniform_int_distribution<std::mt19937::result_type> distMutations(1, mutationMax);
+	std::uniform_int_distribution<std::mt19937::result_type> distOutputs(0,rows*cols+PARAM_IN-1);
+	std::uniform_int_distribution<std::mt19937::result_type> distIndex(0,c.size()-1);
+
+	unsigned gens = distMutations(randGen);   //number of gens for mutations
+	for (unsigned j = 0; j < gens; ++j) {
+		unsigned i = distIndex(randGen); //select chromosome index for mutation
+
+		if (i < rows*cols*CHROMOSOME_BLOCK_SIZE) {
+
+			//block mutation
+			unsigned col = (i / (rows*CHROMOSOME_BLOCK_SIZE));
+			//std::cout << "mutate gen " << i << " col " << col << std::endl;
+			std::uniform_int_distribution<std::mt19937::result_type> dist(0,colVal[col].size()-1);
+			if ((i % CHROMOSOME_BLOCK_SIZE) < 2) {
+				//block input mutation
+				c[i]=colVal[col][dist(randGen)];
+			} else { //mutace fce
+				if(damaged.find(PARAM_IN+i/CHROMOSOME_BLOCK_SIZE)!=damaged.end()){
+					//this block is damaged
+					continue;
+				}
+				c[i]=distFunctions(randGen);
+			}
+		} else {
+			//output mutation
+			c[i]=distOutputs(randGen);
+		}
+	}
+}
+
+Chromosome CGP::evolve(const unsigned runs,
+			const std::vector<Image>& train, const std::vector<Image>& trainOut){
+
+	u_int64_t bestFitness=std::numeric_limits<u_int64_t>::max();	//best fitness
+	Chromosome theMVP;	//best chromosome so far
+
+
+	//distribution for connecting outputs
+	std::uniform_int_distribution<std::mt19937::result_type> distOutputs(0,rows*cols+PARAM_IN-1);
+	//run evolution multiple times
+	for (unsigned run=0; run < runs; run++) {
+
+		std::cout << "Evolution run: " << run << std::endl;
+		//create initial population
+		Population population(populationSize);
+
+		//std::cout << "\tGenerate intial population."<< std::endl;
+		for (unsigned i = 0; i < populationSize; i++) {
+			//for i-th chromosome
+			for(unsigned actColumn=0; actColumn< cols; ++actColumn){
+				std::uniform_int_distribution<std::mt19937::result_type> dist(0,colVal[actColumn].size()-1);
+				for (unsigned r = 0; r < rows; ++r) {
+					//one block
+
+					//first input
+					unsigned ra=dist(randGen);
+					//std::cout << "\tFI col "<< actColumn << ", rand " <<ra << " val " <<colVal[actColumn][ra] << std::endl;
+					population[i].push_back(colVal[actColumn][ra]);
+					//second input
+					ra=dist(randGen);
+					//std::cout << "\tSI col "<< actColumn << ", rand " <<ra << " val " <<colVal[actColumn][ra] << std::endl;
+					population[i].push_back(colVal[actColumn][ra]);
+					//function
+
+					if(damaged.find(PARAM_IN+population[i].size()/CHROMOSOME_BLOCK_SIZE)==damaged.end()){
+						population[i].push_back(distFunctions(randGen));
+					}else{
+						//block is damaged
+						population[i].push_back(static_cast<int>(Function::DAMAGED));
+					}
+
+				}
+			}
+
+			//do not forget to connect the outputs
+			for (unsigned j = 0; j < PARAM_OUT; ++j)
+				population[i].push_back(distOutputs(randGen));
+			/*
+			std::cout << "\t chromosome "<< population[i].size() <<":" <<std::endl;
+
+			unsigned cnt=0;
+			for(auto a :population[i]){
+				if(cnt++%3 ==0)std::cout <<PARAM_IN+(cnt/3) <<": ";
+				std::cout << a << " ";
+				if(cnt%3 ==0)std::cout <<", ";
+			}
+			std::cout <<std::endl;*/
+		}
+
+
+		//std::cout << "\tEvaluate intial population of "<< population.size() << " individuals."<< std::endl;
+		//evaluate intial population
+
+		u_int64_t tmpBestFitness;
+		unsigned tmpBestIndex;
+
+		evaluate(population, tmpBestFitness, tmpBestIndex, train, trainOut);
+		if(tmpBestFitness<=bestFitness){
+			bestFitness=tmpBestFitness;
+			theMVP=population[tmpBestIndex];
+		}
+		/*
+		std::cout << "\t chromosome "<< population[tmpBestIndex].size() <<":" <<std::endl;
+
+									unsigned cnt=0;
+									for(auto a :population[tmpBestIndex]){
+										if(cnt++%3 ==0)std::cout <<PARAM_IN+(cnt/3) <<": ";
+										std::cout << a << " ";
+										if(cnt%3 ==0)std::cout <<", ";
+									}
+									std::cout <<std::endl;
+
+		std::cout << "\tStart evolution."<< std::endl;*/
+		//evolution
+		for(unsigned actGen=0; actGen<generations; ++actGen){
+			//mutate the best
+			//std::cout << "\t\tmutate."<< std::endl;
+			for (unsigned i=0; i < populationSize;  i++) {
+				population[i]=theMVP;
+				mutate(population[i]);
+			}
+
+			//evaluate population
+			//std::cout << "\t\tevaluate."<< std::endl;
+
+			evaluate(population, tmpBestFitness, tmpBestIndex, train, trainOut);
+			if(tmpBestFitness<=bestFitness){
+				//we searched at least as good individual as actual MVP
+				//so change it
+				//(Equal is because of diversity)
+				theMVP=population[tmpBestIndex];
+				bestFitness=tmpBestFitness;
+
+			}
+		}
+
+		std::cout << "\tBest fitness so far in all runs: " << bestFitness << std::endl;
+/*
+		std::cout << "\t chromosome "<< theMVP.size() <<":" <<std::endl;
+
+					cnt=0;
+					for(auto a :theMVP){
+						if(cnt++%3 ==0)std::cout <<PARAM_IN+(cnt/3) <<": ";
+						std::cout << a << " ";
+						if(cnt%3 ==0)std::cout <<", ";
+					}
+					std::cout <<std::endl;*/
+	}
+
+	//the end
+	return theMVP;
+
+}
+
+
+/*** End of file: CGP.cpp ***/

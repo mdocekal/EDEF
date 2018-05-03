@@ -380,7 +380,7 @@ inline void CGP::mutate(Chromosome& c){
 				//block input mutation
 				c[i]=colVal[col][dist(randGen)];
 			} else { //mutace fce
-				if(damaged.find(PARAM_IN+i)!=damaged.end()){
+				if(damaged.find(PARAM_IN+i/CHROMOSOME_BLOCK_SIZE)!=damaged.end()){
 					//this block is damaged
 					continue;
 				}

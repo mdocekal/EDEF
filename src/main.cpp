@@ -270,11 +270,11 @@ const char Args::PROGRAM_NAME[]="EDEF";
  * @param[out] rows
  *	Loaded number of rows.
  */
-inline void loadChromosome(std::ifstream& f, Chromosome& c, u_int32_t& cols, u_int32_t& rows){
+inline void loadChromosome(std::ifstream& f, Chromosome& c, uint32_t& cols, uint32_t& rows){
 	f.read(reinterpret_cast<char *>(&cols), sizeof(cols));
 	f.read(reinterpret_cast<char *>(&rows), sizeof(rows));
 	c.resize(CGP::CHROMOSOME_BLOCK_SIZE*cols*rows+1);
-	f.read(reinterpret_cast<char *>(&c[0]), sizeof(u_int32_t)*(CGP::CHROMOSOME_BLOCK_SIZE*cols*rows+1));
+	f.read(reinterpret_cast<char *>(&c[0]), sizeof(uint32_t)*(CGP::CHROMOSOME_BLOCK_SIZE*cols*rows+1));
 
 }
 
@@ -290,14 +290,14 @@ inline void loadChromosome(std::ifstream& f, Chromosome& c, u_int32_t& cols, u_i
  * @param[in] rows
  * 	Rows for saving.
  */
-inline void saveChromosome(std::string& path, Chromosome& c, u_int32_t cols, u_int32_t rows){
+inline void saveChromosome(std::string& path, Chromosome& c, uint32_t cols, uint32_t rows){
 	std::ofstream f(path, std::ios::binary);
 	if (!f) {
 		throw std::invalid_argument(
 				"Must specify chromosome file that can be open for writting.");
 	}
 
-	u_int32_t val = cols;
+	uint32_t val = cols;
 	f.write(reinterpret_cast<const char *>(&val), sizeof(val));
 	val = rows;
 	f.write(reinterpret_cast<const char *>(&val), sizeof(val));
@@ -306,6 +306,25 @@ inline void saveChromosome(std::string& path, Chromosome& c, u_int32_t cols, u_i
 		f.write(reinterpret_cast<const char *>(&g), sizeof(g));
 	}
 
+}
+
+/**
+ * Get indexes of damaged blocks in given chromosome.
+ *
+ * @param[in] c
+ * 	The chromosome.
+ * @return
+ * 	Indexes of damaged blocks.
+ */
+inline std::set<uint32_t> getDamagedBlocks(const Chromosome& c){
+	std::set<uint32_t> damagedBlocks;
+	for (unsigned i = 2; i < c.size(); i += CGP::CHROMOSOME_BLOCK_SIZE) { //third is function
+		if (c[i] == static_cast<unsigned>(CGP::Function::DAMAGED)) {
+			damagedBlocks.insert(
+					i / CGP::CHROMOSOME_BLOCK_SIZE + CGP::PARAM_IN);
+		}
+	}
+	return damagedBlocks;
 }
 
 int main(int argc, char* argv[]){
@@ -333,10 +352,12 @@ int main(int argc, char* argv[]){
 		case Args::Action::TRAIN:
 			{
 				//train new chromosome
-
-				for(auto KV : myArgs.getConfig()){
-					std::cout << KV.first << " = " << KV.second <<std::endl;
+				std::cout << "Used configuration: ";
+				for(auto KV : config){
+					std::cout << KV.first << " = " << KV.second <<", ";
 				}
+
+				std::cout << std::endl;
 
 				CGP cgp(config.getCols(), config.getRows(), config.getlBack());
 				cgp.setPopulationSize(config.getPopulationSize());
@@ -365,17 +386,9 @@ int main(int argc, char* argv[]){
 
 				//perform evolution
 				Chromosome c=cgp.evolve(config.getRuns(), train, trainOut);
-				/*cgp.setGenerations(1);
-				cgp.setPopulationSize(1);
-
-				std::vector<Image> setik;
-				setik.push_back(img);
-
-				Chromosome c=cgp.evolve(1, setik, setik);*/
 
 
 				std::cout << "Saving chromosome." << std::endl;
-				std::cout << "Chromosome ("<< c.size() <<"): ";
 				//save chromosome
 				saveChromosome(myArgs.getOut(), c, config.getCols(), config.getRows());
 				std::cout << "\tSAVED" << std::endl;
@@ -407,7 +420,59 @@ int main(int argc, char* argv[]){
 			}
 			break;
 		case Args::Action::REPAIR:
+			{
+				//chromosome repair
+				//load chromosome
+				std::cout << "Load chromosome." << std::endl;
+				uint32_t cols;
+				uint32_t rows;
+				Chromosome c;
+				loadChromosome(myArgs.getChromosome(), c, cols, rows);
+				config.setCols(cols);
+				config.setRows(rows);
 
+				std::cout << "\tLOADED" << std::endl;
+
+				std::cout << "Used configuration: ";
+				for (auto KV : config) {
+					std::cout << KV.first << " = " << KV.second << ", ";
+				}
+				std::cout<< std::endl;
+				//load images
+				std::cout << "Load train set." << std::endl;
+				std::vector<Image> train;
+				for (auto iPath : myArgs.getSet()) {
+					train.push_back(std::move(Image(iPath)));
+				}
+				std::cout << "\tLOADED" << std::endl;
+
+				std::cout << "Load train setOut." << std::endl;
+				std::vector<Image> trainOut;
+				for (auto iPath : myArgs.getSetOut()) {
+					trainOut.push_back(std::move(Image(iPath)));
+				}
+				std::cout << "\tLOADED" << std::endl;
+
+				std::cout << "Start repair." << std::endl;
+
+
+				CGP cgp(config.getCols(), config.getRows(), config.getlBack());
+				cgp.setPopulationSize(config.getPopulationSize());
+				cgp.setMutationMax(config.getMaxMutations());
+				cgp.setGenerations(config.getGenerations());
+				//set damged blocks
+				cgp.setDamaged(getDamagedBlocks(c));
+
+				//perform evolution
+				Chromosome repC=cgp.evolve(config.getRuns(), train, trainOut);
+
+				std::cout << "Saving chromosome." << std::endl;
+				//save chromosome
+				saveChromosome(myArgs.getOut(), repC, config.getCols(), config.getRows());
+				std::cout << "\tSAVED" << std::endl;
+
+
+			}
 			break;
 		case Args::Action::DAMAGE:
 			//damage given chromosome
@@ -483,8 +548,7 @@ int main(int argc, char* argv[]){
 				std::cout << "Blocks: "<< cols*rows <<"\n";
 				std::cout << "Used blocks ("<< usedB.size() <<"): ";
 
-				std::vector<u_int32_t> damagedUsedBlocks;
-				std::vector<u_int32_t> damagedBlocks;
+				std::vector<uint32_t> damagedUsedBlocks;
 
 				for(auto uB:usedB){
 					std::cout << uB << " ";
@@ -498,12 +562,7 @@ int main(int argc, char* argv[]){
 					std::cout << duB << " ";
 				}
 
-				for(unsigned i=2; i<c.size();i+=CGP::CHROMOSOME_BLOCK_SIZE){ //third is function
-					if(c[i] == static_cast<unsigned>(CGP::Function::DAMAGED)){
-						damagedBlocks.push_back(i/CGP::CHROMOSOME_BLOCK_SIZE+CGP::PARAM_IN);
-					}
-				}
-
+				std::set<uint32_t> damagedBlocks(getDamagedBlocks(c));
 				//damaged blocks
 				std::cout << "\nDamaged blocks ("<< damagedBlocks.size() <<"): ";
 				for(auto dB:damagedBlocks){

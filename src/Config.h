@@ -166,6 +166,34 @@ public:
 		return runs;
 	}
 
+	void setCols(uint32_t cols) {
+		this->cols = cols;
+	}
+
+	void setGenerations(unsigned generations) {
+		this->generations = generations;
+	}
+
+	void setlBack(unsigned lBack) {
+		this->lBack = lBack;
+	}
+
+	void setMaxMutations(unsigned maxMutations) {
+		this->maxMutations = maxMutations;
+	}
+
+	void setPopulationSize(unsigned populationSize) {
+		this->populationSize = populationSize;
+	}
+
+	void setRows(uint32_t rows) {
+		this->rows = rows;
+	}
+
+	void setRuns(unsigned runs) {
+		this->runs = runs;
+	}
+
 private:
 	std::map<std::string, std::string> data; //! Loaded configuration
 
