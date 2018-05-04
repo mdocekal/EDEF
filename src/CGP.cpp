@@ -341,7 +341,8 @@ Chromosome CGP::evolve(const unsigned runs,
 	std::uniform_int_distribution<std::mt19937::result_type> distOutputs(0,rows*cols+PARAM_IN-1);
 	//run evolution multiple times
 	for (unsigned run=0; run < runs; run++) {
-
+		uint64_t bestFitnessRun=std::numeric_limits<uint64_t>::max();	//best fitness
+		Chromosome bestInRun;	//best chromosome so far
 		std::cout << "Evolution run: " << run << std::endl;
 		//create initial population
 		Population population(populationSize);
@@ -383,30 +384,36 @@ Chromosome CGP::evolve(const unsigned runs,
 		unsigned tmpBestIndex;
 
 		evaluate(population, tmpBestFitness, tmpBestIndex, train, trainOut);
-		if(tmpBestFitness<=bestFitness){
-			bestFitness=tmpBestFitness;
-			theMVP=population[tmpBestIndex];
+		if(tmpBestFitness<=bestFitnessRun){
+			bestFitnessRun=tmpBestFitness;
+			bestInRun=population[tmpBestIndex];
 		}
 
 		//evolution
 		for(unsigned actGen=0; actGen<generations; ++actGen){
 			//mutate the best
 			for (unsigned i=0; i < populationSize;  i++) {
-				population[i]=theMVP;
+				population[i]=bestInRun;
 				mutate(population[i]);
 			}
 
 			//evaluate population
 
 			evaluate(population, tmpBestFitness, tmpBestIndex, train, trainOut);
-			if(tmpBestFitness<=bestFitness){
+			if(tmpBestFitness<=bestFitnessRun){
 				//we searched at least as good individual as actual MVP
 				//so change it
 				//(Equal is because of diversity)
-				theMVP=population[tmpBestIndex];
-				bestFitness=tmpBestFitness;
+				bestInRun=population[tmpBestIndex];
+				bestFitnessRun=tmpBestFitness;
 
 			}
+		}
+
+		std::cout << "\tBest fitness in run: " << bestFitnessRun << std::endl;
+		if(bestFitnessRun<=bestFitness){
+			theMVP=bestInRun;
+			bestFitness=bestFitnessRun;
 		}
 
 		std::cout << "\tBest fitness so far in all runs: " << bestFitness << std::endl;

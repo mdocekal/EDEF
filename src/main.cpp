@@ -109,12 +109,12 @@ public:
 				out=argv[i];
 			}else if(actArg=="-config"){
 				if(++i>=argc){
-					throw std::invalid_argument("Must specify chromosome file that can be open for reading.");
+					throw std::invalid_argument("Must specify config file that can be open for reading.");
 				}
 
 				std::ifstream f(argv[i]);
 				if(!f){
-					throw std::invalid_argument("Must specify chromosome file that can be open for reading.");
+					throw std::invalid_argument("Must specify config file that can be open for reading.");
 				}
 				config.read(f);
 
@@ -475,36 +475,31 @@ int main(int argc, char* argv[]){
 				loadChromosome(myArgs.getChromosome(), c, cols, rows);
 				std::cout << "\tLOADED" << std::endl;
 
-				std::set<unsigned> usedBTmp(CGP::usedBlocks(c));
-				std::vector<unsigned> usedB;
+				std::vector<unsigned> blocks;
+				std::set<uint32_t> damagedBlocks(getDamagedBlocks(c));
 
 				//filter allready damaged blocks
-				for(auto idx: usedBTmp){
-					if(c[(idx-CGP::PARAM_IN)*CGP::CHROMOSOME_BLOCK_SIZE+2] != static_cast<unsigned>(CGP::Function::DAMAGED))
-						usedB.push_back(idx);
-
+				for(unsigned idx=CGP::PARAM_IN; idx<CGP::PARAM_IN+cols*rows; ++idx){
+					if(damagedBlocks.find(idx)==damagedBlocks.end()){
+						blocks.push_back(idx);
+					}
 				}
-				std::copy(usedBTmp.begin(), usedBTmp.end(), std::back_inserter(usedB));
 
 
 				std::mt19937 randGen;
 				randGen.seed(std::random_device()());
 
-				unsigned damage;
+				//randomly damage block
+				if(blocks.size()>0){
+					std::uniform_int_distribution<std::mt19937::result_type> dist(0, blocks.size()-1);
+					unsigned damage=blocks[dist(randGen)];
 
-				if(usedB.size()==0){
-					//just randomly damage any block
-					std::uniform_int_distribution<std::mt19937::result_type> dist(CGP::PARAM_IN, CGP::PARAM_IN+cols*rows-1);
-					damage=dist(randGen);
+					CGP::damageBlock(c, damage);
+					std::cout << "Block "<< damage << " is damaged." << std::endl;
 				}else{
-					//randomly damage used block
-					std::uniform_int_distribution<std::mt19937::result_type> dist(0, usedB.size()-1);
-					damage=usedB[dist(randGen)];
+					std::cout << "All blocks are damaged."<< std::endl;
 				}
 
-				CGP::damageBlock(c, damage);
-
-				std::cout << "Block "<< damage << " is damaged." << std::endl;
 				std::cout << "Saving chromosome." << std::endl;
 				//save chromosome
 				saveChromosome(myArgs.getOut(), c, cols, rows);
