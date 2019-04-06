@@ -3,6 +3,20 @@ EDEF is evolutionary designer of edge filter. You can develop, test, use, damage
 
 Only JPEG image format is supported.
 
+## Ilustration
+<table>
+	<tr>
+		<th>Original</th>
+		<th>Sobel filter (reference)</th>
+		<th>Evolutionary designed</th>
+	</tr>
+	<tr>
+		<td><img src="data/orig.jpg" width="250" alt="original"></td>
+		<td><img src="data/sobel.jpg" width="250" alt="Sobel filter"></td>
+		<td><img src="data/evo.jpg" width="250" alt="Evolutionary designed"></td>
+	</tr>
+</table>
+
 ## Install
 EDEF needs to be compiled. Use:
 
