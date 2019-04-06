@@ -18,7 +18,7 @@ Only JPEG image format is supported.
 	<tr>
 		<td><img src="data/orig2.jpg" width="300" alt="original"></td>
 		<td><img src="data/sobel2.jpg" width="300" alt="Sobel filter"></td>
-		<td><img src="data/evo2.jpg" width="300" alt="Evolutionary designed"></td>
+		<td><img src="data/evo2.jpg" width="300" alt="Evolutionarily designed"></td>
 	</tr>
 </table>
 
