@@ -2,7 +2,7 @@
  * Project: EDEF
  * @file CGP.cpp
  * @date 30. 4. 2018
- * @author (just minor adjustments) xdocek09
+ * @author xdocek09
  * @brief Source file for CGP (cartesian genetic programming) class.
  * Inspired from implementation provided in lecture BIN at FIT BUT.
  * https://www.fit.vutbr.cz/study/courses/BIN
