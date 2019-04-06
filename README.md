@@ -11,9 +11,14 @@ Only JPEG image format is supported.
 		<th>Evolutionary designed</th>
 	</tr>
 	<tr>
-		<td><img src="data/orig.jpg" width="250" alt="original"></td>
-		<td><img src="data/sobel.jpg" width="250" alt="Sobel filter"></td>
-		<td><img src="data/evo.jpg" width="250" alt="Evolutionary designed"></td>
+		<td><img src="data/orig.jpg" width="300" alt="original"></td>
+		<td><img src="data/sobel.jpg" width="300" alt="Sobel filter"></td>
+		<td><img src="data/evo.jpg" width="300" alt="Evolutionary designed"></td>
+	</tr>
+	<tr>
+		<td><img src="data/orig2.jpg" width="300" alt="original"></td>
+		<td><img src="data/sobel2.jpg" width="300" alt="Sobel filter"></td>
+		<td><img src="data/evo2.jpg" width="300" alt="Evolutionary designed"></td>
 	</tr>
 </table>
 
